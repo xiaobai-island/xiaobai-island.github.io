@@ -21,8 +21,21 @@
   }
   const afterPageLoad = () => setTimeout(upgradeMap, 300);
   document.readyState === "complete" ? afterPageLoad() : addEventListener("load", afterPageLoad);
+  // 每张图片一个「加载完成」的 Promise，启动画面据此显示进度；加载失败也算完成，不卡住页面
+  const loads = [];
+  function track(img) {
+    const done = new Promise((resolve) => {
+      img.addEventListener("load", resolve, { once: true });
+      img.addEventListener("error", resolve, { once: true });
+    });
+    loads.push(done);
+    return done;
+  }
+  if (!(mapBg.complete && mapBg.naturalWidth)) track(mapBg);
+
   let pending = [];
   function lazySrc(img, src) {
+    track(img);
     pending ? pending.push(() => (img.src = src)) : (img.src = src);
   }
   function flush() {
@@ -236,15 +249,12 @@
 
   // ---------- 跳绳的小孩（素材来自小白工具箱的吉祥物，原尺寸 64 × 112） ----------
 
-  const kid = (() => {
-    if (!cfg.kid) return null;
+  // 地图上和启动画面里各有一个，k 是相对原尺寸的缩放倍数
+  function createKid(k) {
     const K = "assets/kid/";
     const el = document.createElement("div");
     el.className = "kid";
-    el.style.left = cfg.kid.x + "px";
-    el.style.top = cfg.kid.y + "px";
-    el.style.zIndex = Math.round(cfg.kid.y);
-    el.style.setProperty("--k", cfg.kid.h / 112);
+    el.style.setProperty("--k", k);
     el.innerHTML = `
       <div class="kid-fig">
         <div class="kid-shadow"></div>
@@ -267,17 +277,30 @@
         </div>
         <svg class="kid-rope front" viewBox="0 -20 64 170"><path class="rope-front" /></svg>
       </div>`;
-    housesLayer.append(el);
     return {
+      el,
+      t0: 0,
       bob: el.querySelector(".kid-bob"),
       shadow: el.querySelector(".kid-shadow"),
       front: el.querySelector(".rope-front"),
       back: el.querySelector(".rope-back"),
     };
-  })();
+  }
+
+  const kids = [];
+  if (cfg.kid) {
+    const kid = createKid(cfg.kid.h / 112);
+    kid.el.style.left = cfg.kid.x + "px";
+    kid.el.style.top = cfg.kid.y + "px";
+    kid.el.style.zIndex = Math.round(cfg.kid.y);
+    housesLayer.append(kid.el);
+    kids.push(kid);
+  }
 
   // 绳子绕身体转一圈 560ms，往下甩时在身前、往上甩时在身后；绳子到脚下时人正好跳到最高
-  function kidFrame(t) {
+  function kidFrame(kid, now) {
+    const t = now - kid.t0;
+    if (kid.onJump) kid.onJump(Math.floor(t / 560));
     const th = (t / 560) * Math.PI * 2;
     const lift = Math.max(0, Math.cos(th)) ** 2 * 14;
     const hy = 85.9 - lift;
@@ -341,6 +364,61 @@
     return [seg.x0 + (seg.x1 - seg.x0) * t, seg.y0 + (seg.y1 - seg.y0) * t, seg.x1 - seg.x0];
   }
 
+  // ---------- 启动画面：小孩跳绳等加载，素材全部到齐或最多 5 秒后淡出 ----------
+
+  (function splash() {
+    const SPLASH_MAX = 5000;
+    const SPLASH_MIN = 900;
+    const start = performance.now();
+
+    const el = document.createElement("div");
+    el.className = "splash";
+    el.innerHTML = `
+      <div class="splash-card">
+        <div class="splash-kid"></div>
+        <div class="splash-title">小白岛加载中<span class="splash-dots"></span></div>
+        <div class="splash-bar"><i></i></div>
+        <div class="splash-count">跳了 0 下</div>
+      </div>`;
+    const kid = createKid(1.5);
+    kid.t0 = start;
+    el.querySelector(".splash-kid").append(kid.el);
+    document.body.append(el);
+    kids.push(kid);
+
+    const count = el.querySelector(".splash-count");
+    let shown = 0;
+    kid.onJump = (n) => {
+      if (n !== shown) count.textContent = `跳了 ${(shown = n)} 下`;
+    };
+
+    const bar = el.querySelector(".splash-bar i");
+    let done = 0;
+    const total = loads.length || 1;
+    loads.forEach((p) =>
+      p.then(() => {
+        done++;
+        bar.style.width = (done / total) * 100 + "%";
+      })
+    );
+
+    let closed = false;
+    function close() {
+      if (closed) return;
+      closed = true;
+      bar.style.width = "100%";
+      setTimeout(() => {
+        el.classList.add("hide");
+        setTimeout(() => {
+          el.remove();
+          kids.splice(kids.indexOf(kid), 1);
+        }, 600);
+      }, Math.max(0, SPLASH_MIN - (performance.now() - start)));
+    }
+    Promise.all(loads).then(close);
+    setTimeout(close, SPLASH_MAX);
+  })();
+
   let last = performance.now();
   function tick(now) {
     const dt = Math.min((now - last) / 1000, 0.1);
@@ -355,7 +433,7 @@
       boat.el.style.zIndex = Math.round(y);
       boat.el.classList.toggle("flip", goingLeft);
     });
-    if (kid) kidFrame(now);
+    kids.forEach((kid) => kidFrame(kid, now));
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

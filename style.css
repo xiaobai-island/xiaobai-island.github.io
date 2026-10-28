@@ -305,6 +305,116 @@ html.rotated .viewport {
   96.5%, 98.5% { opacity: 1; }
 }
 
+/* ---------- 启动画面 ---------- */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: linear-gradient(#5fb8f0, #2b8fd6);
+  transition: opacity 0.5s ease, visibility 0.5s;
+}
+
+.splash::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  background: var(--lqip) center / cover no-repeat;
+  filter: blur(18px) brightness(1.05);
+  opacity: 0.85;
+}
+
+.splash.hide {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.splash-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 26px 40px 22px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 10px 40px rgba(0, 50, 100, 0.25);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* 小孩按原尺寸 64 × 112 放大 1.5 倍，上方给甩起来的绳子和起跳留空间 */
+.splash-kid {
+  position: relative;
+  width: 96px;
+  height: 168px;
+  margin-top: 34px;
+}
+
+.splash-kid .kid {
+  left: 50%;
+  top: 100%;
+}
+
+.splash-kid .kid-shadow {
+  background: rgba(0, 40, 80, 0.3);
+}
+
+.splash-title {
+  margin-top: 18px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 0 rgba(30, 90, 150, 0.6);
+}
+
+.splash-dots::after {
+  content: "";
+  display: inline-block;
+  width: 1.5em;
+  text-align: left;
+  animation: splash-dots 1.2s steps(4) infinite;
+}
+
+.splash-bar {
+  width: 200px;
+  height: 12px;
+  margin-top: 14px;
+  padding: 2px;
+  border: 1.5px solid #fff3d6;
+  border-radius: 8px;
+  background: rgba(110, 61, 20, 0.45);
+  box-shadow: 0 2px 0 #6e3d14;
+}
+
+.splash-bar i {
+  display: block;
+  width: 4%;
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(#ffd56b, #f0a52a);
+  transition: width 0.35s ease;
+}
+
+.splash-count {
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: 0 1px 0 rgba(30, 90, 150, 0.5);
+}
+
+@keyframes splash-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
 /* ---------- 云 ---------- */
 
 .clouds {
