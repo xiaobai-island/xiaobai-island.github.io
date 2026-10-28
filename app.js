@@ -6,9 +6,21 @@
 
   world.style.width = cfg.width + "px";
   world.style.height = cfg.height + "px";
-  // 底图在 index.html 里按屏幕挑分辨率并预加载；下载完之前显示内嵌的模糊占位图
-  // 房子、云、船的图片等底图下完再开始下载，不和底图抢带宽；底图太慢时 3 秒后也照常加载
+  // 加载顺序：内嵌模糊占位图 → 1600 宽底图 → 房子、云、船 → 高清屏再在后台换成高清底图
+  // 房子、云、船等底图下完再开始下载，不和底图抢带宽；底图太慢时 3 秒后也照常加载
   const mapBg = document.getElementById("mapBg");
+  const HD_MAPS = [2400, 3200];
+
+  function upgradeMap() {
+    const need = cfg.width * (parseFloat(world.style.zoom) || 1) * devicePixelRatio;
+    if (need <= 1800) return;
+    const w = HD_MAPS.find((x) => x >= need * 0.9) || HD_MAPS[HD_MAPS.length - 1];
+    const hd = new Image();
+    hd.src = `assets/map-bg-${w}.webp`;
+    hd.decode().then(() => (mapBg.src = hd.src)).catch(() => {});
+  }
+  const afterPageLoad = () => setTimeout(upgradeMap, 300);
+  document.readyState === "complete" ? afterPageLoad() : addEventListener("load", afterPageLoad);
   let pending = [];
   function lazySrc(img, src) {
     pending ? pending.push(() => (img.src = src)) : (img.src = src);

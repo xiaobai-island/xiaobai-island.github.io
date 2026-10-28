@@ -14,8 +14,8 @@ A = ROOT / "assets"
 
 MAP_WIDTHS = [1600, 2400, 3200]
 MAP_QUALITY = 80
-# 在 2560 宽的 2 倍屏上，房子显示约 112 × 2.5 × 2 = 560 物理像素，取 560 足够清晰
-SPRITE_MAX = {"houses": 560, "boats": 400, "clouds": 900}
+# 1920 宽的 2 倍屏上，房子显示约 112 × 1.875 × 2 = 420 物理像素；国内访问 GitHub 很慢，取 480 兼顾清晰和体积
+SPRITE_MAX = {"houses": 480, "boats": 360, "clouds": 900}
 SPRITE_QUALITY = 78
 
 
