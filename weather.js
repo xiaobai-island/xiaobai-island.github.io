@@ -1,7 +1,8 @@
 // 天气系统：晴、雨、雪、夜按顺序轮换
 // 由 app.js 在页面加载完、启动画面关掉后才加载；没加载或出错时地图保持原样，不影响房子、链接等主功能
 // 画面的明暗、色调由 style.css 里的 CSS 变量控制（随 html[data-weather] 渐变）；雨、雪、星星、海面波光画在两块画布上
-// 网址加 ?weather=rain / snow / night / sunny 可以固定某种天气，?wxdur=秒数 可以改轮换间隔
+// 网址加 ?weather=rain / snow / night / sunny 可以固定某种天气，?weather=real 跟访客所在地真实天气和昼夜同步，
+// ?wxdur=秒数 可以改轮换间隔
 (function () {
   const cfg = window.MAP_CONFIG;
   const wcfg = cfg.weather;
@@ -21,7 +22,23 @@
   try {
     saved = localStorage.getItem("wx-mode");
   } catch {}
-  let fixed = [params.get("weather"), saved].find((k) => KINDS.includes(k)) || null;
+  let fixed = [params.get("weather"), saved].find((k) => KINDS.includes(k) || k === "real") || null;
+
+  // 实时模式：日出前、日落后是夜晚，白天按真实天气下雨、下雪或晴天；数据没到或接口失败时按本地 6~18 点算白天
+  let real = null;
+  function realKind() {
+    const now = Date.now();
+    let day;
+    if (real && real.sunrise) day = now >= real.sunrise && now < real.sunset;
+    else if (real && real.isDay != null) day = real.isDay;
+    else {
+      const h = new Date().getHours();
+      day = h >= 6 && h < 18;
+    }
+    if (!day) return "night";
+    return (real && real.kind) || "sunny";
+  }
+  const wantedKind = () => (fixed === "real" ? realKind() : fixed);
   const duration = Number(params.get("wxdur")) || wcfg.duration;
   const fade = wcfg.fade;
   root.style.setProperty("--wx-fade", fade + "s");
@@ -262,6 +279,7 @@
   // ---------- 右上角天气切换：自动轮换或固定某种天气，选择记在本地 ----------
 
   const OPTIONS = [
+    ["real", "📍", "实时"],
     ["auto", "🔄", "自动"],
     ["sunny", "☀️", "晴"],
     ["rain", "🌧️", "雨"],
@@ -288,7 +306,7 @@
     try {
       fixed ? localStorage.setItem("wx-mode", fixed) : localStorage.removeItem("wx-mode");
     } catch {}
-    setWeather(fixed || current);
+    setWeather(wantedKind() || current);
   });
   document.getElementById("viewport").append(sw);
   requestAnimationFrame(() => sw.classList.add("show"));
@@ -301,7 +319,7 @@
   }
 
   // 从原样渐变到第一种天气，不会突然变色；一打开就是夜晚的话小孩直接待在屋里
-  setWeather(fixed || order[0], true);
+  setWeather(wantedKind() || order[0], true);
 
   // ---------- 绘制 ----------
 
@@ -520,6 +538,12 @@
         idx = (idx + 1) % order.length;
         setWeather(order[idx]);
       }
+    } else if (fixed === "real") {
+      realCheck += dt;
+      if (realCheck >= 20) {
+        realCheck = 0;
+        if (realKind() !== current) setWeather(realKind());
+      }
     }
     KINDS.forEach((k) => {
       const target = k === current ? 1 : 0;
@@ -540,23 +564,30 @@
     requestAnimationFrame(frame);
   }
 
+  let realCheck = 0;
   buildZones();
   requestAnimationFrame(frame);
 
-  if (wcfg.sign) weatherSign(wcfg.sign);
+  weatherSign(wcfg.sign, (w) => {
+    real = w;
+    if (fixed === "real" && realKind() !== current) setWeather(realKind());
+  });
 
 // ---------- 屋顶天气牌：本地时间 + 访客所在城市的真实温度和天气 ----------
 // 定位：myip.ipip.net（国内准）和 ipwho.is 同时请求，优先用前者；天气：open-meteo，失败再用 wttr.in
 // 定位缓存一天、天气缓存 20 分钟；接口全挂时只显示时间
-function weatherSign(pos) {
+// 拿到天气后也交给 onData，供「实时」天气模式使用；没配 sign 时只取数据不显示牌子
+function weatherSign(pos, onData) {
   const el = document.createElement("div");
   el.className = "wx-sign";
-  el.style.left = pos.x + "px";
-  el.style.top = pos.y + "px";
   el.innerHTML = '<div class="wx-sign-time"></div><div class="wx-sign-info" hidden></div>';
-  document.getElementById("labels").append(el);
   const timeEl = el.querySelector(".wx-sign-time");
   const infoEl = el.querySelector(".wx-sign-info");
+  if (pos) {
+    el.style.left = pos.x + "px";
+    el.style.top = pos.y + "px";
+    document.getElementById("labels").append(el);
+  }
 
   const pad = (n) => String(n).padStart(2, "0");
   function clock() {
@@ -564,7 +595,7 @@ function weatherSign(pos) {
     timeEl.innerHTML = `${pad(d.getHours())}<i>:</i>${pad(d.getMinutes())}`;
     setTimeout(clock, (60 - d.getSeconds()) * 1000 + 50);
   }
-  clock();
+  if (pos) clock();
 
   const DAY = 864e5;
   const STALE = 20 * 60e3;
@@ -650,20 +681,38 @@ function weatherSign(pos) {
     return "☀️";
   }
 
+  // 地图能演的天气只有晴、雨、雪三种（夜晚由日出日落决定）
+  function kindOf(text) {
+    if (/雪/.test(text)) return "snow";
+    if (/雨|雷/.test(text)) return "rain";
+    return "sunny";
+  }
+
   async function fetchWeather() {
     try {
       const loc = await locate();
       const j = await getJSON(
-        `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code,is_day&timezone=auto`
+        `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code,is_day&daily=sunrise,sunset&forecast_days=1&timezone=auto`
       );
       const [day, night, text] = wmo(j.current.weather_code);
-      return { city: loc.city, temp: Math.round(j.current.temperature_2m), icon: j.current.is_day ? day : night, text };
+      // daily 给的是当地时间（不带时区），按 utc_offset_seconds 换成时间戳
+      const toMs = (s) => Date.parse(s + "Z") - j.utc_offset_seconds * 1000;
+      return {
+        city: loc.city,
+        temp: Math.round(j.current.temperature_2m),
+        icon: j.current.is_day ? day : night,
+        text,
+        kind: kindOf(text),
+        isDay: !!j.current.is_day,
+        sunrise: toMs(j.daily.sunrise[0]),
+        sunset: toMs(j.daily.sunset[0]),
+      };
     } catch {
       const j = await getJSON("https://wttr.in/?format=j1&lang=zh", 6000);
       const c = j.current_condition[0];
       const text = (c.lang_zh && c.lang_zh[0].value) || "";
       const area = j.nearest_area && j.nearest_area[0];
-      return { city: area ? area.areaName[0].value : "", temp: Number(c.temp_C), icon: iconFor(text), text };
+      return { city: area ? area.areaName[0].value : "", temp: Number(c.temp_C), icon: iconFor(text), text, kind: kindOf(text) };
     }
   }
 
@@ -683,16 +732,17 @@ function weatherSign(pos) {
   }
 
   async function update() {
-    let w = store.get("wx-now", STALE);
+    let w = store.get("wx-now2", STALE);
     if (!w) {
       try {
         w = await fetchWeather();
-        store.set("wx-now", w);
+        store.set("wx-now2", w);
       } catch {
         return;
       }
     }
     render(w);
+    if (onData) onData(w);
   }
   update();
   setInterval(update, STALE);
