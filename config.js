@@ -68,10 +68,10 @@ window.MAP_CONFIG = {
     { img: "assets/boats/boat-1.webp", w: 80, speed: 16,
       route: [[470, 505], [330, 500], [190, 498], [70, 480], [2, 452], [-10, 400], [-6, 350], [6, 310],
         [6, 265], [10, 225], [30, 186], [62, 161], [98, 149]] },
-    { img: "assets/boats/boat-2.webp", w: 72, speed: 12, face: "left",
+    { img: "assets/boats/boat-2.webp", w: 72, speed: 12,
       route: [[520, 505], [650, 508], [820, 515], [950, 502]] },
-    // 内湖里的小船不按远近缩放
-    { img: "assets/boats/boat-3.webp", w: 50, speed: 7, perspective: false, face: "left",
-      route: [[530, 328], [600, 318], [665, 330]] },
+    // 内湖里的小船停在湖中间只轻轻摇晃（route 只给一个点就是停泊），不按远近缩放
+    { img: "assets/boats/boat-3.webp", w: 50, perspective: false,
+      route: [[598, 338]] },
   ],
 };

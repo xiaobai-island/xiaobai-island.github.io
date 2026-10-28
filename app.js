@@ -591,6 +591,15 @@
     return persp.min + (1 - persp.min) * t;
   }
 
+  // route 只有一个点的船原地停泊，只保留轻微摇晃，不进逐帧航行
+  const sailing = boats.filter((boat, i) => {
+    if (boat.segs.length) return true;
+    const [x, y] = cfg.boats[i].route[0];
+    boat.el.style.transform = `translate(${x}px, ${y}px) scale(${boatScale(boat, y)})`;
+    boat.el.style.zIndex = Math.round(y);
+    return false;
+  });
+
   // 船头兴波：每走一小段在船头吃水处留下左右两道波线，波线停在水面上各自向外推开，
   // 船继续往前走，这些波线就沿船身排成向后张开的 V 形尾迹；地图是斜俯视，垂直航向的位移压扁一半
   const WAKE_STEP = 4;
@@ -706,7 +715,7 @@
   function tick(now) {
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
-    boats.forEach((boat) => {
+    sailing.forEach((boat) => {
       boat.dist = (boat.dist + boat.speed * dt) % (boat.total * 2);
       const back = boat.dist > boat.total;
       const d = back ? boat.total * 2 - boat.dist : boat.dist;
