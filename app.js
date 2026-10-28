@@ -88,6 +88,59 @@
   window.addEventListener("resize", fit);
   fit();
 
+  // ---------- 手机横屏 ----------
+  // 支持的浏览器（安卓 Chrome 等）进入全屏并锁定横屏；不支持的（iPhone）把整个页面用 CSS 转 90°，手机横过来看
+
+  const rotateBtn = document.getElementById("rotateBtn");
+  const portraitQ = matchMedia("(orientation: portrait)");
+  const touchQ = matchMedia("(pointer: coarse)");
+  let rotated = false;
+  let locked = false;
+
+  function syncRotate() {
+    // 用户自己把手机横过来了，就不需要再转
+    if (rotated && !portraitQ.matches) rotated = false;
+    document.documentElement.classList.toggle("rotated", rotated);
+    const on = rotated || locked;
+    rotateBtn.hidden = !touchQ.matches || (!portraitQ.matches && !on);
+    rotateBtn.textContent = on ? "↩ 退出横屏" : "⟲ 横屏查看";
+    requestAnimationFrame(fit);
+  }
+
+  async function enterLandscape() {
+    try {
+      await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+      await screen.orientation.lock("landscape");
+      locked = true;
+    } catch {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      rotated = true;
+    }
+    syncRotate();
+  }
+
+  function exitLandscape() {
+    if (locked) {
+      screen.orientation.unlock?.();
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      locked = false;
+    }
+    rotated = false;
+    syncRotate();
+  }
+
+  rotateBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+  rotateBtn.addEventListener("click", () => (rotated || locked ? exitLandscape() : enterLandscape()));
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && locked) {
+      locked = false;
+      syncRotate();
+    }
+  });
+  portraitQ.addEventListener("change", syncRotate);
+  touchQ.addEventListener("change", syncRotate);
+  syncRotate();
+
   // ---------- 地图比屏幕宽时，可左右拖动（鼠标和触屏通用） ----------
 
   let drag = null;
@@ -95,11 +148,12 @@
   viewport.addEventListener("pointerdown", (e) => {
     moved = false;
     if (pan.min === pan.max) return;
-    drag = { x: e.clientX, start: pan.x };
+    drag = { x: rotated ? e.clientY : e.clientX, start: pan.x };
   });
   window.addEventListener("pointermove", (e) => {
     if (!drag) return;
-    const dx = e.clientX - drag.x;
+    // 页面被 CSS 转了 90° 时，地图的横向对应屏幕的纵向
+    const dx = (rotated ? e.clientY : e.clientX) - drag.x;
     if (Math.abs(dx) > 4) {
       moved = true;
       viewport.classList.add("dragging");

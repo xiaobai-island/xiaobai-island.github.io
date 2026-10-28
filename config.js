@@ -17,7 +17,7 @@ window.MAP_CONFIG = {
     { name: "苹果ASO 🍎", url: "https://xiaobai-aso.github.io/", img: "assets/houses/house-2.webp", x: 285, y: 300, w: 112 },
     { name: "玩游戏 🎮", url: "https://xiaobai-kart.github.io/", img: "assets/houses/house-3.webp", x: 400, y: 238, w: 106 },
     { name: "搞钱吧 🤑", url: "https://xiaobai-shouxi.github.io/", img: "assets/houses/house-4.webp", x: 560, y: 248, w: 112 },
-    { img: "assets/houses/house-5.webp", x: 735, y: 405, w: 112 },
+    { name: "小工具 🧰", url: "https://xiaobai-toolbox.github.io/", img: "assets/houses/house-5.webp", x: 735, y: 405, w: 112 },
     { img: "assets/houses/house-6.webp", x: 845, y: 300, w: 112 },
   ],
 

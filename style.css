@@ -30,6 +30,44 @@ body {
   touch-action: none;
 }
 
+/* iPhone 等不能锁定横屏的设备：整个视口转 90°，宽高互换 */
+html.rotated .viewport {
+  inset: auto;
+  top: 0;
+  left: 0;
+  width: 100vh;
+  width: 100dvh;
+  height: 100vw;
+  transform-origin: 0 0;
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.rotate-btn {
+  position: absolute;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 10;
+  padding: 9px 14px;
+  border: 1.5px solid #fff3d6;
+  border-radius: 20px;
+  background: linear-gradient(#c8873f, #9a5a23);
+  box-shadow: 0 2px 0 #6e3d14, 0 4px 10px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font: 700 14px/1 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 0 #6e3d14;
+  cursor: pointer;
+}
+
+.rotate-btn[hidden] {
+  display: none;
+}
+
+.rotate-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #6e3d14, 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
 .viewport.pannable {
   cursor: grab;
 }
