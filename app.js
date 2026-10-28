@@ -546,6 +546,32 @@
   // ---------- 船：沿折线来回航行 ----------
 
   const boatsLayer = document.getElementById("boats");
+
+  // 航线拐点用 Catmull-Rom 连成平滑曲线（首尾端点固定），船转弯时走弧线而不是折线
+  function smoothOpen(pts) {
+    if (pts.length < 3) return pts;
+    const out = [];
+    const at = (i) => pts[Math.max(0, Math.min(pts.length - 1, i))];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+      for (let s = 0; s < 10; s++) {
+        const t = s / 10;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        out.push(
+          [0, 1].map(
+            (k) =>
+              0.5 *
+              (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 +
+                (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3)
+          )
+        );
+      }
+    }
+    out.push(pts[pts.length - 1]);
+    return out;
+  }
+
   const boats = cfg.boats.map((b) => {
     const el = document.createElement("div");
     el.className = "boat";
@@ -557,9 +583,10 @@
 
     const segs = [];
     let total = 0;
-    for (let i = 1; i < b.route.length; i++) {
-      const [x0, y0] = b.route[i - 1];
-      const [x1, y1] = b.route[i];
+    const route = smoothOpen(b.route);
+    for (let i = 1; i < route.length; i++) {
+      const [x0, y0] = route[i - 1];
+      const [x1, y1] = route[i];
       const len = Math.hypot(x1 - x0, y1 - y0);
       segs.push({ x0, y0, x1, y1, len, start: total });
       total += len;
