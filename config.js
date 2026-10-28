@@ -6,7 +6,7 @@
 window.MAP_CONFIG = {
   width: 1024,
   height: 578,
-  background: "assets/map-bg.webp",
+  // 底图写在 index.html 里（多档分辨率 + 预加载），由 tools/build_assets.py 生成
 
   // 无论屏幕什么比例都必须完整显示的区域（房子名称、船的航线都在里面），区域外的天空和海面可以被裁掉
   safe: { x0: 20, y0: 20, x1: 1004, y1: 515 },

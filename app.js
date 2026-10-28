@@ -6,8 +6,25 @@
 
   world.style.width = cfg.width + "px";
   world.style.height = cfg.height + "px";
-  document.getElementById("mapBg").src = cfg.background;
-  document.getElementById("backdrop").style.backgroundImage = `url("${cfg.background}")`;
+  // 底图在 index.html 里按屏幕挑分辨率并预加载；下载完之前显示内嵌的模糊占位图
+  // 房子、云、船的图片等底图下完再开始下载，不和底图抢带宽；底图太慢时 3 秒后也照常加载
+  const mapBg = document.getElementById("mapBg");
+  let pending = [];
+  function lazySrc(img, src) {
+    pending ? pending.push(() => (img.src = src)) : (img.src = src);
+  }
+  function flush() {
+    if (!pending) return;
+    pending.forEach((load) => load());
+    pending = null;
+  }
+  const showMap = () => {
+    world.classList.add("map-ready");
+    flush();
+  };
+  mapBg.complete && mapBg.naturalWidth ? showMap() : mapBg.addEventListener("load", showMap);
+  mapBg.addEventListener("error", flush);
+  setTimeout(flush, 3000);
 
   // ---------- 自适应：一屏放下，不滚动 ----------
   // 横屏：尽量铺满，但 safe 区域必须完整可见，放不下时缩小、两侧露出模糊背景
@@ -119,7 +136,7 @@
 
     const img = document.createElement("img");
     img.className = "house-img";
-    img.src = site.img;
+    lazySrc(img, site.img);
     img.alt = "";
     img.draggable = false;
     house.append(img);
@@ -135,7 +152,9 @@
     const placeLabel = () => {
       label.style.top = site.y - (site.w * img.naturalHeight) / img.naturalWidth + "px";
     };
-    img.complete ? placeLabel() : img.addEventListener("load", placeLabel);
+    // 图片还没下载时先按常见房子比例占位，下完后再精确对齐
+    label.style.top = site.y - site.w * 0.9 + "px";
+    img.addEventListener("load", placeLabel);
 
     const setHover = (on) => {
       house.classList.toggle("hover", on);
@@ -219,7 +238,7 @@
     el.style.setProperty("--to", cfg.width + "px");
 
     const img = new Image();
-    img.src = c.img;
+    lazySrc(img, c.img);
     el.style.animationDuration = c.speed + "s";
     el.style.animationDelay = -Math.random() * c.speed + "s";
     el.append(img);
@@ -233,7 +252,8 @@
     const el = document.createElement("div");
     el.className = "boat";
     el.innerHTML = `<div class="boat-inner" style="width:${b.w}px">
-      <div class="boat-wake"></div><img src="${b.img}" alt="" draggable="false" /></div>`;
+      <div class="boat-wake"></div><img alt="" draggable="false" /></div>`;
+    lazySrc(el.querySelector(".boat-inner img"), b.img);
     el.querySelector(".boat-inner img").style.animationDelay = -Math.random() * 2.6 + "s";
     boatsLayer.append(el);
 

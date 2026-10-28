@@ -18,9 +18,9 @@ body {
 /* 屏幕比地图更宽时，两侧露出的是模糊放大的地图 */
 .backdrop {
   position: fixed;
-  inset: -60px;
-  background: center / cover no-repeat;
-  filter: blur(30px) saturate(1.1);
+  inset: -40px;
+  background: var(--lqip) center / cover no-repeat;
+  filter: blur(20px);
 }
 
 .viewport {
@@ -48,6 +48,17 @@ body {
   position: absolute;
   top: 0;
   left: 0;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.world::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--lqip) center / 100% 100% no-repeat;
+  filter: blur(6px);
 }
 
 .map-bg {
@@ -55,6 +66,12 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.map-ready .map-bg {
+  opacity: 1;
 }
 
 .layer {
