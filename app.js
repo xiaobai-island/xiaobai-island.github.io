@@ -296,7 +296,8 @@
     kid.y = y;
     kid.el.style.left = x + "px";
     kid.el.style.top = y + "px";
-    kid.el.style.zIndex = Math.round(y);
+    // 回家路上脚会走到房子底边以上，按 y 排序会被房子挡住，所以临时提到房子前面
+    kid.el.style.zIndex = kid.zLift || Math.round(y);
   }
 
   const kids = [];
@@ -399,23 +400,34 @@
     const kid = mapKid;
     const home = cfg.kid && cfg.kid.home;
     if (!kid || !home) return;
+    const approach = home.path || [];
+    const door = [home.x, home.y];
+    const lift = Math.round(approach.length ? Math.max(...approach.map((p) => p[1])) : home.y) + 1;
     if (on) {
       if (kid.mode === "inside") return;
+      kid.zLift = lift;
       const goIn = () => {
         kid.mode = "inside";
         kid.el.classList.add("inside");
       };
       if (instant) {
-        putKid(kid, home.x, home.y);
+        putKid(kid, ...door);
         goIn();
-      } else walkTo(kid, home.x, home.y, goIn);
+      } else walkPath(kid, makePath([[kid.x, kid.y], ...approach, door]), goIn);
     } else {
       if (kid.mode === "jump") return;
+      kid.zLift = lift;
       if (kid.mode === "inside") {
-        putKid(kid, home.x, home.y);
+        putKid(kid, ...door);
         kid.el.classList.remove("inside");
       }
-      walkTo(kid, cfg.kid.x, cfg.kid.y, () => startJump(kid));
+      // 原路下台阶出来，再走回跳绳的地方
+      const back = kid.mode === "inside" || (kid.x === home.x && kid.y === home.y) ? [door, ...approach.slice().reverse()] : [[kid.x, kid.y]];
+      walkPath(kid, makePath([...back, [cfg.kid.x, cfg.kid.y]]), () => {
+        kid.zLift = 0;
+        putKid(kid, kid.x, kid.y);
+        startJump(kid);
+      });
     }
   }
 
