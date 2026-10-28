@@ -1,0 +1,332 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1ea7e8;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* 屏幕比地图更宽时，两侧露出的是模糊放大的地图 */
+.backdrop {
+  position: fixed;
+  inset: -60px;
+  background: center / cover no-repeat;
+  filter: blur(30px) saturate(1.1);
+}
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.viewport.pannable {
+  cursor: grab;
+}
+
+.viewport.dragging {
+  cursor: grabbing;
+}
+
+.stage {
+  position: absolute;
+  box-shadow: 0 0 40px rgba(0, 40, 80, 0.25);
+}
+
+/* 内部始终是地图原始像素坐标，由 JS 整体缩放到屏幕 */
+.world {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.map-bg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---------- 房子 ---------- */
+
+.house {
+  position: absolute;
+  display: block;
+  transform: translate(-50%, -100%);
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+}
+
+.house.decor {
+  pointer-events: none;
+}
+
+.house-img {
+  display: block;
+  width: 100%;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(0, 40, 60, 0.25));
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s;
+  transform-origin: 50% 90%;
+}
+
+.labels {
+  z-index: 1100;
+}
+
+.house-label {
+  position: absolute;
+  translate: -50% calc(-100% - 2px);
+  transform-origin: 50% 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+  text-decoration: none;
+  padding: 3px 9px 4px;
+  border-radius: 9px;
+  border: 1.5px solid #fff3d6;
+  background: linear-gradient(#c8873f, #9a5a23);
+  box-shadow: 0 2px 0 #6e3d14, 0 3px 6px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 #6e3d14;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: label-float 3s ease-in-out infinite;
+}
+
+.house.hover {
+  z-index: 999 !important;
+}
+
+.house.hover .house-img {
+  transform: scale(1.12) translateY(-3px);
+  filter: drop-shadow(0 0 6px rgba(255, 240, 160, 0.95)) drop-shadow(0 6px 6px rgba(0, 40, 60, 0.3));
+}
+
+.house-label.hover {
+  z-index: 1;
+  animation: none;
+  transform: translateY(-14px) scale(1.12);
+  box-shadow: 0 2px 0 #6e3d14, 0 0 10px rgba(255, 230, 140, 0.9);
+}
+
+.house.hover:active .house-img {
+  transform: scale(1.04);
+}
+
+@keyframes label-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* ---------- 跳绳的小孩 ---------- */
+
+/* 内部按吉祥物原尺寸 64 × 112 排版，再整体缩放 --k 倍，脚底中心对准配置坐标 */
+.kid {
+  position: absolute;
+  width: 64px;
+  height: 112px;
+  transform: translate(-50%, -100%) scale(var(--k));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+
+.kid-fig {
+  position: relative;
+  width: 64px;
+  height: 112px;
+}
+
+.kid-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 38px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(20, 60, 10, 0.35);
+  filter: blur(2px);
+  transform: translateX(-50%);
+}
+
+.kid-bob {
+  position: absolute;
+  inset: 0;
+}
+
+.kid-head {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 2;
+  width: 52px;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
+}
+
+.kid-head img {
+  display: block;
+  width: 100%;
+}
+
+.kid-lids {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  animation: kid-blink 4.6s infinite;
+}
+
+.kid-body {
+  position: absolute;
+  left: 0;
+  top: 72px;
+  width: 64px;
+  height: 40px;
+  overflow: visible;
+}
+
+.kid-body .arm-l {
+  transform-origin: 17.7px 1.7px;
+  transform: rotate(25deg);
+}
+
+.kid-body .arm-r {
+  transform-origin: 46.3px 1.7px;
+  transform: rotate(-25deg);
+}
+
+.kid-rope {
+  position: absolute;
+  left: 0;
+  top: -20px;
+  width: 64px;
+  height: 170px;
+  overflow: visible;
+}
+
+.kid-rope path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.kid-rope .rope-back {
+  stroke: #be123c;
+  stroke-width: 2.4;
+}
+
+.kid-rope.front {
+  z-index: 3;
+}
+
+.kid-rope .rope-front {
+  stroke: #f43f5e;
+  stroke-width: 2.8;
+}
+
+@keyframes kid-blink {
+  0%, 95%, 100% { opacity: 0; }
+  96.5%, 98.5% { opacity: 1; }
+}
+
+/* ---------- 云 ---------- */
+
+.clouds {
+  z-index: 1000;
+}
+
+.cloud {
+  position: absolute;
+  left: 0;
+  will-change: transform;
+  animation: cloud-drift linear infinite;
+}
+
+.cloud img {
+  display: block;
+  width: 100%;
+  filter: drop-shadow(0 6px 8px rgba(0, 60, 110, 0.12));
+}
+
+@keyframes cloud-drift {
+  from { transform: translateX(var(--from)); }
+  to { transform: translateX(var(--to)); }
+}
+
+/* ---------- 船 ---------- */
+
+.boat {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.boat-inner {
+  position: relative;
+  transform: translate(-50%, -85%);
+}
+
+.boat-inner img {
+  display: block;
+  width: 100%;
+  transform-origin: 50% 100%;
+  animation: boat-bob 2.6s ease-in-out infinite;
+}
+
+.boat.flip .boat-inner img {
+  scale: -1 1;
+}
+
+/* 船尾的水波 */
+.boat-wake {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 120%;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 70%);
+  transform: translateX(-50%);
+  animation: wake 2.6s ease-in-out infinite;
+}
+
+@keyframes boat-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-2px) rotate(2deg); }
+}
+
+@keyframes wake {
+  0%, 100% { opacity: 0.5; transform: translateX(-50%) scaleX(0.9); }
+  50% { opacity: 0.9; transform: translateX(-50%) scaleX(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud,
+  .house-label,
+  .boat-inner img,
+  .boat-wake {
+    animation-play-state: paused;
+  }
+}
