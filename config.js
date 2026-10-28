@@ -27,6 +27,16 @@ window.MAP_CONFIG = {
   // 新标签页打开填 true
   openInNewTab: true,
 
+  // 天气：按 order 轮换，每种持续 duration 秒，切换渐变 fade 秒
+  // horizon 是海平线的 y（以上算天空，星星只出现在天空里），moon 是夜里月亮的位置
+  weather: {
+    order: ["sunny", "rain", "sunny", "snow", "night"],
+    duration: 40,
+    fade: 3,
+    horizon: 137,
+    moon: { x: 560, y: 38 },
+  },
+
   // 云：y 是高度，w 是显示宽度，speed 是横穿整张地图需要的秒数
   clouds: [
     { img: "assets/clouds/cloud-1.webp", y: 45,  w: 215, speed: 90,  opacity: 0.95 },

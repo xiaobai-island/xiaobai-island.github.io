@@ -1,5 +1,6 @@
 (function () {
   const cfg = window.MAP_CONFIG;
+  const VERSION = document.currentScript ? new URL(document.currentScript.src).search : "";
   const viewport = document.getElementById("viewport");
   const stage = document.getElementById("stage");
   const world = document.getElementById("world");
@@ -412,12 +413,27 @@
         setTimeout(() => {
           el.remove();
           kids.splice(kids.indexOf(kid), 1);
+          loadExtras();
         }, 600);
       }, Math.max(0, SPLASH_MIN - (performance.now() - start)));
     }
     Promise.all(loads).then(close);
     setTimeout(close, SPLASH_MAX);
   })();
+
+  // ---------- 天气等装饰效果：页面加载完、启动画面关掉后，趁浏览器空闲再加载，不占首屏 ----------
+
+  function loadExtras() {
+    const inject = () => {
+      const s = document.createElement("script");
+      s.src = "weather.js" + VERSION;
+      s.async = true;
+      document.body.append(s);
+    };
+    const whenIdle = () =>
+      window.requestIdleCallback ? requestIdleCallback(inject, { timeout: 3000 }) : setTimeout(inject, 500);
+    document.readyState === "complete" ? whenIdle() : addEventListener("load", whenIdle, { once: true });
+  }
 
   let last = performance.now();
   function tick(now) {
