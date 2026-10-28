@@ -281,25 +281,154 @@
     return {
       el,
       t0: 0,
+      mode: "jump",
       bob: el.querySelector(".kid-bob"),
       shadow: el.querySelector(".kid-shadow"),
       front: el.querySelector(".rope-front"),
       back: el.querySelector(".rope-back"),
+      legs: [el.querySelector(".leg-l"), el.querySelector(".leg-r")],
+      arms: [el.querySelector(".arm-l"), el.querySelector(".arm-r")],
     };
   }
 
-  const kids = [];
-  if (cfg.kid) {
-    const kid = createKid(cfg.kid.h / 112);
-    kid.el.style.left = cfg.kid.x + "px";
-    kid.el.style.top = cfg.kid.y + "px";
-    kid.el.style.zIndex = Math.round(cfg.kid.y);
-    housesLayer.append(kid.el);
-    kids.push(kid);
+  function putKid(kid, x, y) {
+    kid.x = x;
+    kid.y = y;
+    kid.el.style.left = x + "px";
+    kid.el.style.top = y + "px";
+    kid.el.style.zIndex = Math.round(y);
   }
+
+  const kids = [];
+  let mapKid = null;
+  if (cfg.kid) {
+    mapKid = createKid(cfg.kid.h / 112);
+    putKid(mapKid, cfg.kid.x, cfg.kid.y);
+    housesLayer.append(mapKid.el);
+    kids.push(mapKid);
+  }
+
+  // ---------- 天黑回屋：weather.js 切到夜晚时调用 Island.setNight(true)，小孩收起跳绳走进 home 房子的门，天亮再走出来 ----------
+
+  const WALK_SPEED = 22;
+
+  // 途经点用 Catmull-Rom 连成闭合的平滑曲线，按弧长等速行走
+  function smoothLoop(pts) {
+    const out = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const [p0, p1, p2, p3] = [pts[(i - 1 + n) % n], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]];
+      for (let s = 0; s < 12; s++) {
+        const t = s / 12;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        out.push(
+          [0, 1].map(
+            (k) =>
+              0.5 *
+              (2 * p1[k] + (-p0[k] + p2[k]) * t + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 +
+                (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3)
+          )
+        );
+      }
+    }
+    out.push(out[0]);
+    return out;
+  }
+
+  function makePath(pts) {
+    const lens = [0];
+    for (let i = 1; i < pts.length; i++)
+      lens.push(lens[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    return { pts, lens, total: lens[lens.length - 1] };
+  }
+
+  function pathAt(path, d) {
+    let i = 1;
+    while (i < path.lens.length - 1 && path.lens[i] < d) i++;
+    const seg = path.lens[i] - path.lens[i - 1] || 1;
+    const t = Math.min(1, Math.max(0, (d - path.lens[i - 1]) / seg));
+    const [x0, y0] = path.pts[i - 1];
+    const [x1, y1] = path.pts[i];
+    return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t];
+  }
+
+  const loopPath = cfg.kid && cfg.kid.route ? makePath(smoothLoop([[cfg.kid.x, cfg.kid.y], ...cfg.kid.route])) : null;
+  const JUMP_MS = ((cfg.kid && cfg.kid.jump) || 8) * 1000;
+  if (mapKid && loopPath) mapKid.jumpUntil = performance.now() + JUMP_MS;
+
+  function walkPath(kid, path, done) {
+    kid.mode = "walk";
+    kid.walk = { path, t0: performance.now(), dur: (path.total / WALK_SPEED) * 1000, done };
+  }
+
+  function walkTo(kid, x, y, done) {
+    walkPath(kid, makePath([[kid.x, kid.y], [x, y]]), done);
+  }
+
+  function startJump(kid) {
+    kid.mode = "jump";
+    kid.t0 = performance.now();
+    kid.jumpUntil = kid.t0 + JUMP_MS;
+  }
+
+  function walkFrame(kid, now) {
+    const w = kid.walk;
+    const p = Math.min(1, (now - w.t0) / w.dur);
+    const [x, y] = pathAt(w.path, p * w.path.total);
+    putKid(kid, x, y);
+    // 迈腿：左右腿绕胯部反向摆动，手臂放下前后甩，身体随步子轻微起伏
+    const s = Math.sin(((now - w.t0) / 1000) * Math.PI * 2 * 2.2);
+    kid.legs[0].setAttribute("transform", `rotate(${s * 24} 23.4 25.4)`);
+    kid.legs[1].setAttribute("transform", `rotate(${-s * 24} 40.7 25.4)`);
+    kid.arms[0].style.transform = `rotate(${4 - s * 14}deg)`;
+    kid.arms[1].style.transform = `rotate(${-4 - s * 14}deg)`;
+    kid.bob.style.transform = `translateY(${-Math.abs(s) * 1.8}px)`;
+    kid.shadow.style.transform = "translateX(-50%)";
+    kid.front.setAttribute("d", "");
+    kid.back.setAttribute("d", "");
+    if (p >= 1) {
+      kid.legs.forEach((g) => g.removeAttribute("transform"));
+      kid.arms.forEach((g) => (g.style.transform = ""));
+      kid.walk = null;
+      w.done();
+    }
+  }
+
+  function setNight(on, instant) {
+    const kid = mapKid;
+    const home = cfg.kid && cfg.kid.home;
+    if (!kid || !home) return;
+    if (on) {
+      if (kid.mode === "inside") return;
+      const goIn = () => {
+        kid.mode = "inside";
+        kid.el.classList.add("inside");
+      };
+      if (instant) {
+        putKid(kid, home.x, home.y);
+        goIn();
+      } else walkTo(kid, home.x, home.y, goIn);
+    } else {
+      if (kid.mode === "jump") return;
+      if (kid.mode === "inside") {
+        putKid(kid, home.x, home.y);
+        kid.el.classList.remove("inside");
+      }
+      walkTo(kid, cfg.kid.x, cfg.kid.y, () => startJump(kid));
+    }
+  }
+
+  window.Island = { setNight };
 
   // 绳子绕身体转一圈 560ms，往下甩时在身前、往上甩时在身后；绳子到脚下时人正好跳到最高
   function kidFrame(kid, now) {
+    if (kid.mode === "walk") return walkFrame(kid, now);
+    if (kid.mode !== "jump") return;
+    if (kid.jumpUntil && loopPath && now >= kid.jumpUntil) {
+      walkPath(kid, loopPath, () => startJump(kid));
+      return walkFrame(kid, now);
+    }
     const t = now - kid.t0;
     if (kid.onJump) kid.onJump(Math.floor(t / 560));
     const th = (t / 560) * Math.PI * 2;

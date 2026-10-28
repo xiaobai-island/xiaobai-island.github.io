@@ -139,6 +139,79 @@ html.rotated .viewport {
   cursor: pointer;
 }
 
+/* 右上角天气切换：木牌风格的分段按钮，weather.js 加载后淡入 */
+.wx-switch {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1.5px solid #fff3d6;
+  border-radius: 18px;
+  background: linear-gradient(#c8873f, #9a5a23);
+  box-shadow: 0 2px 0 #6e3d14, 0 4px 10px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.wx-switch.show {
+  opacity: 1;
+  transform: none;
+}
+
+.wx-switch button {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: #fff;
+  font: 700 12px/1 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  text-shadow: 0 1px 0 #6e3d14;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.wx-switch button span {
+  font-size: 13px;
+  text-shadow: none;
+}
+
+.wx-switch button em {
+  font-style: normal;
+}
+
+.wx-switch button:hover {
+  background: rgba(255, 243, 214, 0.18);
+}
+
+.wx-switch button[aria-pressed="true"] {
+  background: linear-gradient(#ffd56b, #f0a52a);
+  color: #6e3d14;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 -1px 0 rgba(110, 61, 20, 0.35);
+}
+
+/* 自动模式下，标出现在轮到的天气 */
+.wx-switch button.now:not([aria-pressed="true"]) {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 223, 130, 0.9);
+}
+
+/* 手机上只显示图标 */
+@media (max-width: 700px), (max-height: 500px) {
+  .wx-switch button {
+    padding: 5px 7px;
+  }
+  .wx-switch button em {
+    display: none;
+  }
+}
+
 .rotate-btn[hidden] {
   display: none;
 }
@@ -387,18 +460,6 @@ html.rotated .viewport {
   animation-delay: -1.3s;
 }
 
-/* 牌子下面挂在屋顶上的小三角 */
-.wx-sign::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -6px;
-  border: 5px solid transparent;
-  border-top-color: #fff3d6;
-  border-bottom: 0;
-  transform: translateX(-50%);
-}
-
 .wx-sign-time {
   font-size: 15px;
   font-weight: 800;
@@ -465,6 +526,14 @@ html.rotated .viewport {
   position: relative;
   width: 64px;
   height: 112px;
+  transform-origin: 50% 100%;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+/* 走到门口后缩小淡出，像进了屋 */
+.kid.inside .kid-fig {
+  opacity: 0;
+  transform: scale(0.6);
 }
 
 .kid-shadow {

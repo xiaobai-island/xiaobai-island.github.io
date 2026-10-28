@@ -16,7 +16,12 @@
   const H = cfg.height;
   const KINDS = ["sunny", "rain", "snow", "night"];
 
-  const fixed = KINDS.includes(params.get("weather")) ? params.get("weather") : null;
+  // 固定的天气：网址参数优先，其次是访客在右上角选过的
+  let saved = null;
+  try {
+    saved = localStorage.getItem("wx-mode");
+  } catch {}
+  let fixed = [params.get("weather"), saved].find((k) => KINDS.includes(k)) || null;
   const duration = Number(params.get("wxdur")) || wcfg.duration;
   const fade = wcfg.fade;
   root.style.setProperty("--wx-fade", fade + "s");
@@ -246,14 +251,57 @@
   let idx = 0;
   let elapsed = 0;
 
-  function setWeather(kind) {
+  function setWeather(kind, instant) {
     current = kind;
     root.dataset.weather = kind;
     if (kind === "night" || (!fixed && order[(idx + 1) % order.length] === "night")) addLights();
+    if (window.Island) Island.setNight(kind === "night", instant);
+    syncSwitch();
   }
 
-  // 从原样渐变到第一种天气，不会突然变色
-  setWeather(fixed || order[0]);
+  // ---------- 右上角天气切换：自动轮换或固定某种天气，选择记在本地 ----------
+
+  const OPTIONS = [
+    ["auto", "🔄", "自动"],
+    ["sunny", "☀️", "晴"],
+    ["rain", "🌧️", "雨"],
+    ["snow", "❄️", "雪"],
+    ["night", "🌙", "夜"],
+  ];
+  const sw = document.createElement("div");
+  sw.className = "wx-switch";
+  sw.setAttribute("role", "group");
+  sw.setAttribute("aria-label", "天气");
+  sw.innerHTML = OPTIONS.map(
+    ([k, ico, name]) => `<button type="button" data-k="${k}" title="${name}"><span>${ico}</span><em>${name}</em></button>`
+  ).join("");
+  sw.addEventListener("pointerdown", (e) => e.stopPropagation());
+  sw.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const k = btn.dataset.k;
+    if (k === "auto") {
+      fixed = null;
+      elapsed = 0;
+      idx = Math.max(0, order.indexOf(current));
+    } else fixed = k;
+    try {
+      fixed ? localStorage.setItem("wx-mode", fixed) : localStorage.removeItem("wx-mode");
+    } catch {}
+    setWeather(fixed || current);
+  });
+  document.getElementById("viewport").append(sw);
+  requestAnimationFrame(() => sw.classList.add("show"));
+
+  function syncSwitch() {
+    sw.querySelectorAll("button").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.k === (fixed || "auto")));
+      b.classList.toggle("now", b.dataset.k === current);
+    });
+  }
+
+  // 从原样渐变到第一种天气，不会突然变色；一打开就是夜晚的话小孩直接待在屋里
+  setWeather(fixed || order[0], true);
 
   // ---------- 绘制 ----------
 
