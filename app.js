@@ -599,6 +599,8 @@
       speed: b.speed,
       perspective: b.perspective !== false,
       faceLeft: b.face === "left",
+      bowDir: 1,
+      tilt: 0,
       dist: Math.random() * total * 2,
       wakeGap: 0,
     };
@@ -630,17 +632,21 @@
   // 船头兴波：每走一小段在船头吃水处留下左右两道波线，波线停在水面上各自向外推开，
   // 船继续往前走，这些波线就沿船身排成向后张开的 V 形尾迹；地图是斜俯视，垂直航向的位移压扁一半
   const WAKE_STEP = 4;
+  const BOAT_TILT = 12;
   const MAX_RIPPLES = 120;
   const WAKE_MS = 2600;
   const WAKE_OPEN = 16;
   let ripples = 0;
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 波线从画面上看得见的船头出发（船图只有侧视，竖着走时也按船头朝向和倾角算），向真实航向的后方推开
   function spawnRipple(boat, x, y, ux, uy, s) {
     if (reduceMotion || ripples >= MAX_RIPPLES || x < -20 || x > cfg.width + 20) return;
     const len = boat.w * s;
-    const bx = x + ux * len * 0.4;
-    const by = y + uy * len * 0.2;
-    const heading = (Math.atan2(uy * 0.5, ux) * 180) / Math.PI;
+    const bow = boat.bowDir;
+    const tiltRad = (boat.tilt * Math.PI) / 180;
+    const bx = x + bow * len * 0.4 * Math.cos(tiltRad);
+    const by = y + bow * len * 0.4 * Math.sin(tiltRad);
+    const heading = boat.tilt + (bow < 0 ? 180 : 0);
     for (const side of [-1, 1]) {
       const px = -uy * side * len * 0.5 - ux * len * 0.7;
       const py = (ux * side * len * 0.5 - uy * len * 0.7) * 0.5;
@@ -751,10 +757,14 @@
       const ux = (sign * (seg.x1 - seg.x0)) / (seg.len || 1);
       const uy = (sign * (seg.y1 - seg.y0)) / (seg.len || 1);
       const s = boatScale(boat, y);
-      boat.el.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
-      boat.el.style.zIndex = Math.round(y);
       // 沿左侧海岸接近竖直行驶时保持原来的朝向，避免来回翻转
-      if (Math.abs(ux) > 0.2) boat.el.classList.toggle("flip", ux < 0 !== boat.faceLeft);
+      if (Math.abs(ux) > 0.2) boat.bowDir = ux < 0 ? -1 : 1;
+      boat.el.classList.toggle("flip", boat.bowDir < 0 !== boat.faceLeft);
+      // 往远处（画面上方）开时船头微微抬起、往近处开时压低，竖着走也看得出是船头在前
+      const tiltTo = boat.bowDir * uy * BOAT_TILT;
+      boat.tilt += (tiltTo - boat.tilt) * Math.min(1, dt * 2);
+      boat.el.style.transform = `translate(${x}px, ${y}px) rotate(${boat.tilt}deg) scale(${s})`;
+      boat.el.style.zIndex = Math.round(y);
       boat.wakeGap += boat.speed * dt;
       if (boat.wakeGap >= WAKE_STEP) {
         boat.wakeGap = 0;
