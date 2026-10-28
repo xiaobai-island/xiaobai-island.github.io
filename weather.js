@@ -744,7 +744,8 @@ function weatherSign(pos, onData) {
     render(w);
     if (onData) onData(w);
   }
+  // 每分钟看一眼缓存，超过 20 分钟就重新请求；直接按 20 分钟定时会碰上缓存差一点没过期，变成 40 分钟才更新
   update();
-  setInterval(update, STALE);
+  setInterval(update, 60e3);
 }
 })();
