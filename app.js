@@ -564,13 +564,52 @@
       segs.push({ x0, y0, x1, y1, len, start: total });
       total += len;
     }
-    return { el, segs, total, speed: b.speed, dist: Math.random() * total * 2 };
+    return {
+      el,
+      segs,
+      total,
+      w: b.w,
+      speed: b.speed,
+      perspective: b.perspective !== false,
+      dist: Math.random() * total * 2,
+      wakeGap: 0,
+    };
   });
 
   function pointAt(boat, d) {
     const seg = boat.segs.find((s) => d <= s.start + s.len) || boat.segs[boat.segs.length - 1];
     const t = seg.len ? (d - seg.start) / seg.len : 0;
-    return [seg.x0 + (seg.x1 - seg.x0) * t, seg.y0 + (seg.y1 - seg.y0) * t, seg.x1 - seg.x0];
+    return [seg.x0 + (seg.x1 - seg.x0) * t, seg.y0 + (seg.y1 - seg.y0) * t, seg];
+  }
+
+  // 近大远小：y 从 near 往 far（海平线）缩到 min 倍
+  const persp = cfg.perspective;
+  function boatScale(boat, y) {
+    if (!persp || !boat.perspective) return 1;
+    const t = Math.min(1, Math.max(0, (y - persp.far) / (persp.near - persp.far)));
+    return persp.min + (1 - persp.min) * t;
+  }
+
+  // 船尾水波纹：每走一小段在船尾留下一圈椭圆波纹，慢慢扩散变淡；同屏数量有上限
+  const WAKE_STEP = 6;
+  const MAX_RIPPLES = 80;
+  let ripples = 0;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function spawnRipple(boat, x, y, ux, uy, s) {
+    if (reduceMotion || ripples >= MAX_RIPPLES || x < -20 || x > cfg.width + 20) return;
+    const back = boat.w * s * 0.38;
+    const r = document.createElement("i");
+    r.className = "ripple";
+    r.style.left = x - ux * back + "px";
+    r.style.top = y - uy * back + 1 + "px";
+    r.style.width = boat.w * s * 0.45 + "px";
+    r.style.zIndex = Math.round(y) - 1;
+    ripples++;
+    r.addEventListener("animationend", () => {
+      r.remove();
+      ripples--;
+    });
+    boatsLayer.append(r);
   }
 
   // ---------- 启动画面：小孩跳绳等加载，素材全部到齐或最多 5 秒后淡出 ----------
@@ -651,11 +690,20 @@
       boat.dist = (boat.dist + boat.speed * dt) % (boat.total * 2);
       const back = boat.dist > boat.total;
       const d = back ? boat.total * 2 - boat.dist : boat.dist;
-      const [x, y, dir] = pointAt(boat, d);
-      const goingLeft = back ? dir > 0 : dir < 0;
-      boat.el.style.transform = `translate(${x}px, ${y}px)`;
+      const [x, y, seg] = pointAt(boat, d);
+      const sign = back ? -1 : 1;
+      const ux = (sign * (seg.x1 - seg.x0)) / (seg.len || 1);
+      const uy = (sign * (seg.y1 - seg.y0)) / (seg.len || 1);
+      const s = boatScale(boat, y);
+      boat.el.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
       boat.el.style.zIndex = Math.round(y);
-      boat.el.classList.toggle("flip", goingLeft);
+      // 沿左侧海岸接近竖直行驶时保持原来的朝向，避免来回翻转
+      if (Math.abs(ux) > 0.2) boat.el.classList.toggle("flip", ux < 0);
+      boat.wakeGap += boat.speed * dt;
+      if (boat.wakeGap >= WAKE_STEP) {
+        boat.wakeGap = 0;
+        spawnRipple(boat, x, y, ux, uy, s);
+      }
     });
     kids.forEach((kid) => kidFrame(kid, now));
     if (mapKid) bubbleFrame(mapKid, now);

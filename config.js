@@ -61,12 +61,16 @@ window.MAP_CONFIG = {
   ],
 
   // 船：沿 route 上的点来回航行（到终点后原路返回），speed 是每秒移动的地图像素
+  // 帆船从下方海面沿左侧海岸一路开到左上角远海；越靠近海平线（y 越小）船显示得越小，近大远小
+  perspective: { far: 145, near: 500, min: 0.55 },
   boats: [
-    { img: "assets/boats/boat-1.webp", w: 80, speed: 14,
-      route: [[60, 478], [180, 496], [330, 492], [470, 500]] },
-    { img: "assets/boats/boat-2.webp", w: 72, speed: 11,
-      route: [[560, 492], [650, 504], [745, 500]] },
-    { img: "assets/boats/boat-3.webp", w: 50, speed: 7,
+    { img: "assets/boats/boat-1.webp", w: 80, speed: 16,
+      route: [[470, 505], [330, 500], [190, 498], [70, 480], [2, 452], [-10, 400], [-6, 350], [6, 310],
+        [6, 265], [10, 225], [30, 186], [62, 161], [98, 149]] },
+    { img: "assets/boats/boat-2.webp", w: 72, speed: 12,
+      route: [[520, 505], [650, 508], [820, 515], [950, 502]] },
+    // 内湖里的小船不按远近缩放
+    { img: "assets/boats/boat-3.webp", w: 50, speed: 7, perspective: false,
       route: [[530, 328], [600, 318], [665, 330]] },
   ],
 };

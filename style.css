@@ -881,6 +881,24 @@ html.rotated .viewport {
   animation: wake 2.6s ease-in-out infinite;
 }
 
+/* 船尾留下的水波纹：扁椭圆细圈，向外扩散并淡出 */
+.ripple {
+  position: absolute;
+  aspect-ratio: 3;
+  border: 1.6px solid rgba(255, 255, 255, calc(0.95 - var(--night) * 0.45));
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0) 55%, rgba(255, 255, 255, 0.28) 100%);
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.5);
+  translate: -50% -50%;
+  pointer-events: none;
+  animation: ripple 2.8s ease-out forwards;
+}
+
+@keyframes ripple {
+  0% { opacity: 1; transform: scale(0.45); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
 @keyframes boat-bob {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50% { transform: translateY(-2px) rotate(2deg); }
@@ -896,6 +914,7 @@ html.rotated .viewport {
   .house-label,
   .boat-inner img,
   .boat-wake,
+  .ripple,
   .wx-rays i {
     animation-play-state: paused;
   }
