@@ -590,26 +590,45 @@
     return persp.min + (1 - persp.min) * t;
   }
 
-  // 船尾水波纹：每走一小段在船尾留下一圈椭圆波纹，慢慢扩散变淡；同屏数量有上限
-  const WAKE_STEP = 6;
-  const MAX_RIPPLES = 80;
+  // 船头兴波：每走一小段在船头吃水处留下左右两道波线，波线停在水面上各自向外推开，
+  // 船继续往前走，这些波线就沿船身排成向后张开的 V 形尾迹；地图是斜俯视，垂直航向的位移压扁一半
+  const WAKE_STEP = 4;
+  const MAX_RIPPLES = 120;
+  const WAKE_MS = 2600;
+  const WAKE_OPEN = 16;
   let ripples = 0;
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function spawnRipple(boat, x, y, ux, uy, s) {
     if (reduceMotion || ripples >= MAX_RIPPLES || x < -20 || x > cfg.width + 20) return;
-    const back = boat.w * s * 0.38;
-    const r = document.createElement("i");
-    r.className = "ripple";
-    r.style.left = x - ux * back + "px";
-    r.style.top = y - uy * back + 1 + "px";
-    r.style.width = boat.w * s * 0.45 + "px";
-    r.style.zIndex = Math.round(y) - 1;
-    ripples++;
-    r.addEventListener("animationend", () => {
-      r.remove();
-      ripples--;
-    });
-    boatsLayer.append(r);
+    const len = boat.w * s;
+    const bx = x + ux * len * 0.4;
+    const by = y + uy * len * 0.2;
+    const heading = (Math.atan2(uy * 0.5, ux) * 180) / Math.PI;
+    for (const side of [-1, 1]) {
+      const px = -uy * side * len * 0.5 - ux * len * 0.7;
+      const py = (ux * side * len * 0.5 - uy * len * 0.7) * 0.5;
+      const r = document.createElement("i");
+      r.className = "ripple";
+      r.style.left = bx + "px";
+      r.style.top = by + "px";
+      r.style.width = len * 0.3 + "px";
+      r.style.zIndex = Math.round(y) - 1;
+      const rot = heading - side * WAKE_OPEN;
+      const flipArc = side > 0 ? " scaleY(-1)" : "";
+      ripples++;
+      r.animate(
+        [
+          { transform: `translate(0, 0) rotate(${rot}deg) scale(0.5)${flipArc}`, opacity: 0.95 },
+          { transform: `translate(${px * 0.35}px, ${py * 0.35}px) rotate(${rot}deg) scale(1)${flipArc}`, opacity: 0.8, offset: 0.25 },
+          { transform: `translate(${px}px, ${py}px) rotate(${rot}deg) scale(1.9)${flipArc}`, opacity: 0 },
+        ],
+        { duration: WAKE_MS, easing: "ease-out", fill: "forwards" }
+      ).onfinish = () => {
+        r.remove();
+        ripples--;
+      };
+      boatsLayer.append(r);
+    }
   }
 
   // ---------- 启动画面：小孩跳绳等加载，素材全部到齐或最多 5 秒后淡出 ----------
