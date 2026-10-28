@@ -571,6 +571,7 @@
       w: b.w,
       speed: b.speed,
       perspective: b.perspective !== false,
+      faceLeft: b.face === "left",
       dist: Math.random() * total * 2,
       wakeGap: 0,
     };
@@ -717,7 +718,7 @@
       boat.el.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
       boat.el.style.zIndex = Math.round(y);
       // 沿左侧海岸接近竖直行驶时保持原来的朝向，避免来回翻转
-      if (Math.abs(ux) > 0.2) boat.el.classList.toggle("flip", ux < 0);
+      if (Math.abs(ux) > 0.2) boat.el.classList.toggle("flip", ux < 0 !== boat.faceLeft);
       boat.wakeGap += boat.speed * dt;
       if (boat.wakeGap >= WAKE_STEP) {
         boat.wakeGap = 0;
