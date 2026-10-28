@@ -757,8 +757,8 @@
       const ux = (sign * (seg.x1 - seg.x0)) / (seg.len || 1);
       const uy = (sign * (seg.y1 - seg.y0)) / (seg.len || 1);
       const s = boatScale(boat, y);
-      // 沿左侧海岸接近竖直行驶时保持原来的朝向，避免来回翻转
-      if (Math.abs(ux) > 0.2) boat.bowDir = ux < 0 ? -1 : 1;
+      // 只要水平方向真的变了就掉头：航线已平滑，横向分量只在真正拐向另一边时变号，不会来回抖
+      if (Math.abs(ux) > 0.02 && ux * boat.bowDir < 0) boat.bowDir = -boat.bowDir;
       boat.el.classList.toggle("flip", boat.bowDir < 0 !== boat.faceLeft);
       // 往远处（画面上方）开时船头微微抬起、往近处开时压低，竖着走也看得出是船头在前
       const tiltTo = boat.bowDir * uy * BOAT_TILT;
