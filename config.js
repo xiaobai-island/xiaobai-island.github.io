@@ -65,7 +65,7 @@ window.MAP_CONFIG = {
   // face 是船图里船头朝哪边（默认 right），程序据此让船头始终朝前进方向
   perspective: { far: 145, near: 500, min: 0.55 },
   boats: [
-    { img: "assets/boats/boat-1.webp", w: 80, speed: 16,
+    { img: "assets/boats/boat-1.webp", w: 80, speed: 16, face: "left",
       route: [[470, 505], [340, 503], [220, 498], [140, 488], [85, 476], [40, 464], [14, 446], [5, 418],
         [6, 380], [11, 330], [13, 290], [17, 255], [26, 222], [42, 192], [66, 166], [98, 150]] },
     { img: "assets/boats/boat-2.webp", w: 72, speed: 12,
