@@ -648,8 +648,8 @@
     const by = y + bow * len * 0.4 * Math.sin(tiltRad);
     const heading = boat.tilt + (bow < 0 ? 180 : 0);
     for (const side of [-1, 1]) {
-      const px = -uy * side * len * 0.5 - ux * len * 0.7;
-      const py = (ux * side * len * 0.5 - uy * len * 0.7) * 0.5;
+      const px = -uy * side * len * 0.3 - ux * len * 1.0;
+      const py = (ux * side * len * 0.3 - uy * len * 1.0) * 0.5;
       const r = document.createElement("i");
       r.className = "ripple";
       r.style.left = bx + "px";
