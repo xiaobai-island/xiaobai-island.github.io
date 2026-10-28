@@ -613,7 +613,7 @@
       r.style.left = bx + "px";
       r.style.top = by + "px";
       r.style.width = len * 0.3 + "px";
-      r.style.zIndex = Math.round(y) - 1;
+      r.style.zIndex = 0;
       const rot = heading - side * WAKE_OPEN;
       const flipArc = side > 0 ? " scaleY(-1)" : "";
       ripples++;
