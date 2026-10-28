@@ -358,8 +358,10 @@
   const JUMP_MS = ((cfg.kid && cfg.kid.jump) || 8) * 1000;
   if (mapKid && loopPath) mapKid.jumpUntil = performance.now() + JUMP_MS;
 
-  function walkPath(kid, path, done) {
+  // trip 标记这趟是散步、回家还是出门，头顶说的话据此挑选
+  function walkPath(kid, path, done, trip = "walk") {
     kid.mode = "walk";
+    kid.trip = trip;
     kid.walk = { path, t0: performance.now(), dur: (path.total / WALK_SPEED) * 1000, done };
   }
 
@@ -369,6 +371,7 @@
 
   function startJump(kid) {
     kid.mode = "jump";
+    kid.trip = null;
     kid.t0 = performance.now();
     kid.jumpUntil = kid.t0 + JUMP_MS;
   }
@@ -413,7 +416,10 @@
       if (instant) {
         putKid(kid, ...door);
         goIn();
-      } else walkPath(kid, makePath([[kid.x, kid.y], ...approach, door]), goIn);
+      } else {
+        walkPath(kid, makePath([[kid.x, kid.y], ...approach, door]), goIn, "home");
+        sayNow(kid);
+      }
     } else {
       if (kid.mode === "jump") return;
       kid.zLift = lift;
@@ -423,15 +429,76 @@
       }
       // 原路下台阶出来，再走回跳绳的地方
       const back = kid.mode === "inside" || (kid.x === home.x && kid.y === home.y) ? [door, ...approach.slice().reverse()] : [[kid.x, kid.y]];
-      walkPath(kid, makePath([...back, [cfg.kid.x, cfg.kid.y]]), () => {
-        kid.zLift = 0;
-        putKid(kid, kid.x, kid.y);
-        startJump(kid);
-      });
+      walkPath(
+        kid,
+        makePath([...back, [cfg.kid.x, cfg.kid.y]]),
+        () => {
+          kid.zLift = 0;
+          putKid(kid, kid.x, kid.y);
+          startJump(kid);
+        },
+        "out"
+      );
+      sayNow(kid);
     }
   }
 
   window.Island = { setNight };
+
+  // ---------- 头顶的话：按天气和正在做的事轮播，说几秒、停几秒 ----------
+
+  const LINES = {
+    jump: ["一、二、三……", "我跳得高不高？", "再跳一会儿～", "跳绳冠军就是我！", "呼～有点累了"],
+    walk: ["去海边散散步～", "看看小船回来没", "哼哼哼～🎵", "这边的花好香", "今天走了好多步"],
+    home: ["天黑啦，回家咯～", "妈妈喊我吃饭了", "晚安，小岛 🌙"],
+    out: ["早上好！☀️", "新的一天开始啦", "我又来玩啦～"],
+    sunny: ["今天也要元气满满！", "太阳晒得暖洋洋 ☀️", "天气真好呀～"],
+    rain: ["下雨啦，踩水坑！", "雨伞忘带了…", "滴答滴答 🌧️"],
+    snow: ["下雪啦！想堆雪人 ⛄", "好冷好冷～", "雪花落在鼻子上了 ❄️"],
+  };
+  const SAY_MS = 3200;
+  const bubble = document.createElement("div");
+  bubble.className = "kid-bubble";
+  labelsLayer.append(bubble);
+  let sayUntil = 0;
+  let nextSay = performance.now() + 2500;
+  let lastLine = "";
+
+  function pickLine(kid) {
+    const act = kid.mode === "walk" ? kid.trip : "jump";
+    const weather = document.documentElement.dataset.weather;
+    let pool = LINES[act] || [];
+    // 回家、出门只说应景的话；跳绳和散步时混进天气相关的
+    if (act === "jump" || act === "walk") pool = pool.concat(LINES[weather] || []);
+    if (act === "jump") {
+      const n = Math.floor((performance.now() - kid.t0) / 560);
+      if (n > 3) pool = pool.concat(`跳了 ${n} 下啦！`);
+    }
+    const choices = pool.filter((s) => s !== lastLine);
+    return (lastLine = choices[(Math.random() * choices.length) | 0] || "");
+  }
+
+  function sayNow(kid) {
+    const text = pickLine(kid);
+    if (!text) return;
+    bubble.textContent = text;
+    bubble.classList.remove("show");
+    void bubble.offsetWidth;
+    bubble.classList.add("show");
+    sayUntil = performance.now() + SAY_MS;
+    nextSay = sayUntil + 2200 + Math.random() * 2500;
+  }
+
+  function bubbleFrame(kid, now) {
+    if (kid.mode === "inside") {
+      bubble.classList.remove("show");
+      return;
+    }
+    if (now >= nextSay) sayNow(kid);
+    else if (now >= sayUntil) bubble.classList.remove("show");
+    bubble.style.left = kid.x + "px";
+    bubble.style.top = kid.y - cfg.kid.h - 3 + "px";
+  }
 
   // 绳子绕身体转一圈 560ms，往下甩时在身前、往上甩时在身后；绳子到脚下时人正好跳到最高
   function kidFrame(kid, now) {
@@ -591,6 +658,7 @@
       boat.el.classList.toggle("flip", goingLeft);
     });
     kids.forEach((kid) => kidFrame(kid, now));
+    if (mapKid) bubbleFrame(mapKid, now);
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
