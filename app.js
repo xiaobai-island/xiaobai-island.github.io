@@ -497,7 +497,7 @@
     if (now >= nextSay) sayNow(kid);
     else if (now >= sayUntil) bubble.classList.remove("show");
     bubble.style.left = kid.x + "px";
-    bubble.style.top = kid.y - cfg.kid.h - 3 + "px";
+    bubble.style.top = kid.y - cfg.kid.h - 10 + "px";
   }
 
   // 绳子绕身体转一圈 560ms，往下甩时在身前、往上甩时在身后；绳子到脚下时人正好跳到最高
