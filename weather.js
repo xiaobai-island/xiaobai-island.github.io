@@ -494,4 +494,159 @@
 
   buildZones();
   requestAnimationFrame(frame);
+
+  if (wcfg.sign) weatherSign(wcfg.sign);
+
+// ---------- 屋顶天气牌：本地时间 + 访客所在城市的真实温度和天气 ----------
+// 定位：myip.ipip.net（国内准）和 ipwho.is 同时请求，优先用前者；天气：open-meteo，失败再用 wttr.in
+// 定位缓存一天、天气缓存 20 分钟；接口全挂时只显示时间
+function weatherSign(pos) {
+  const el = document.createElement("div");
+  el.className = "wx-sign";
+  el.style.left = pos.x + "px";
+  el.style.top = pos.y + "px";
+  el.innerHTML = '<div class="wx-sign-time"></div><div class="wx-sign-info" hidden></div>';
+  document.getElementById("labels").append(el);
+  const timeEl = el.querySelector(".wx-sign-time");
+  const infoEl = el.querySelector(".wx-sign-info");
+
+  const pad = (n) => String(n).padStart(2, "0");
+  function clock() {
+    const d = new Date();
+    timeEl.innerHTML = `${pad(d.getHours())}<i>:</i>${pad(d.getMinutes())}`;
+    setTimeout(clock, (60 - d.getSeconds()) * 1000 + 50);
+  }
+  clock();
+
+  const DAY = 864e5;
+  const STALE = 20 * 60e3;
+  const store = {
+    get(k, maxAge) {
+      try {
+        const v = JSON.parse(localStorage.getItem(k));
+        return v && Date.now() - v.t < maxAge ? v.d : null;
+      } catch {
+        return null;
+      }
+    },
+    set(k, d) {
+      try {
+        localStorage.setItem(k, JSON.stringify({ t: Date.now(), d }));
+      } catch {}
+    },
+  };
+
+  const getJSON = (url, ms = 5000) =>
+    fetch(url, { signal: AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined }).then((r) => {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    });
+
+  async function viaIpip() {
+    const j = await getJSON("https://myip.ipip.net/json", 3000);
+    const [country, region, city] = j.data.location;
+    const name = city || region || country;
+    if (!name) throw new Error("no city");
+    const g = await getJSON(
+      `https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=${encodeURIComponent(name)}`
+    );
+    const r = g.results && g.results[0];
+    if (!r) throw new Error("no geo");
+    return { city: name, lat: r.latitude, lon: r.longitude };
+  }
+
+  async function viaIpwho() {
+    const j = await getJSON("https://ipwho.is/?lang=zh-CN&fields=success,city,region,latitude,longitude", 4000);
+    if (!j.success) throw new Error("ipwho");
+    return { city: j.city || j.region, lat: j.latitude, lon: j.longitude };
+  }
+
+  async function locate() {
+    const cached = store.get("wx-loc", DAY);
+    if (cached) return cached;
+    const b = viaIpwho();
+    b.catch(() => {});
+    let loc;
+    try {
+      loc = await viaIpip();
+    } catch {
+      loc = await b;
+    }
+    store.set("wx-loc", loc);
+    return loc;
+  }
+
+  // WMO 天气代码 → [白天图标, 夜间图标, 文字]
+  function wmo(code) {
+    if (code === 0) return ["☀️", "🌙", "晴"];
+    if (code === 1) return ["🌤️", "🌙", "晴间多云"];
+    if (code === 2) return ["⛅", "☁️", "多云"];
+    if (code === 3) return ["☁️", "☁️", "阴"];
+    if (code === 45 || code === 48) return ["🌫️", "🌫️", "雾"];
+    if (code >= 51 && code <= 57) return ["🌦️", "🌧️", "小雨"];
+    if (code >= 61 && code <= 67) return ["🌧️", "🌧️", code >= 65 ? "大雨" : code >= 63 ? "中雨" : "小雨"];
+    if (code >= 71 && code <= 77) return ["❄️", "❄️", code >= 75 ? "大雪" : "雪"];
+    if (code >= 80 && code <= 82) return ["🌦️", "🌧️", "阵雨"];
+    if (code === 85 || code === 86) return ["🌨️", "🌨️", "阵雪"];
+    if (code >= 95) return ["⛈️", "⛈️", "雷阵雨"];
+    return ["🌡️", "🌡️", ""];
+  }
+
+  function iconFor(text) {
+    if (/雷/.test(text)) return "⛈️";
+    if (/雪/.test(text)) return "❄️";
+    if (/雨/.test(text)) return "🌧️";
+    if (/雾|霾/.test(text)) return "🌫️";
+    if (/阴/.test(text)) return "☁️";
+    if (/云/.test(text)) return "⛅";
+    return "☀️";
+  }
+
+  async function fetchWeather() {
+    try {
+      const loc = await locate();
+      const j = await getJSON(
+        `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,weather_code,is_day&timezone=auto`
+      );
+      const [day, night, text] = wmo(j.current.weather_code);
+      return { city: loc.city, temp: Math.round(j.current.temperature_2m), icon: j.current.is_day ? day : night, text };
+    } catch {
+      const j = await getJSON("https://wttr.in/?format=j1&lang=zh", 6000);
+      const c = j.current_condition[0];
+      const text = (c.lang_zh && c.lang_zh[0].value) || "";
+      const area = j.nearest_area && j.nearest_area[0];
+      return { city: area ? area.areaName[0].value : "", temp: Number(c.temp_C), icon: iconFor(text), text };
+    }
+  }
+
+  function render(w) {
+    infoEl.textContent = "";
+    const ico = document.createElement("span");
+    ico.className = "wx-sign-ico";
+    ico.textContent = w.icon;
+    infoEl.append(ico, ` ${w.text} ${w.temp}°`);
+    if (w.city) {
+      const city = document.createElement("span");
+      city.className = "wx-sign-city";
+      city.textContent = w.city;
+      infoEl.append(city);
+    }
+    infoEl.hidden = false;
+  }
+
+  async function update() {
+    let w = store.get("wx-now", STALE);
+    if (!w) {
+      try {
+        w = await fetchWeather();
+        store.set("wx-now", w);
+      } catch {
+        return;
+      }
+    }
+    render(w);
+  }
+  update();
+  setInterval(update, STALE);
+}
 })();

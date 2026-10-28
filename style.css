@@ -369,6 +369,77 @@ html.rotated .viewport {
   transform: scale(1.04);
 }
 
+/* 屋顶上的时间、天气牌：和名称牌同一套木牌风格，不可点击 */
+.wx-sign {
+  position: absolute;
+  translate: -50% -100%;
+  padding: 3px 10px 4px;
+  border-radius: 10px;
+  border: 1.5px solid #fff3d6;
+  background: linear-gradient(#c8873f, #9a5a23);
+  box-shadow: 0 2px 0 #6e3d14, 0 3px 6px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 #6e3d14;
+  pointer-events: none;
+  animation: label-float 3s ease-in-out infinite;
+  animation-delay: -1.3s;
+}
+
+/* 牌子下面挂在屋顶上的小三角 */
+.wx-sign::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  border: 5px solid transparent;
+  border-top-color: #fff3d6;
+  border-bottom: 0;
+  transform: translateX(-50%);
+}
+
+.wx-sign-time {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wx-sign-time i {
+  font-style: normal;
+  animation: colon-blink 2s steps(1) infinite;
+}
+
+.wx-sign-info {
+  margin-top: 1px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+
+.wx-sign-info[hidden] {
+  display: none;
+}
+
+.wx-sign-ico {
+  text-shadow: none;
+}
+
+.wx-sign-city {
+  margin-left: 4px;
+  padding-left: 4px;
+  border-left: 1px solid rgba(255, 243, 214, 0.6);
+  opacity: 0.92;
+}
+
+@keyframes colon-blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
 @keyframes label-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-3px); }
