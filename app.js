@@ -203,15 +203,21 @@
     return a;
   }
 
-  // 风车叶片：正面画的叶片在平面里转，外层再用 matrix 压扁、斜切成房子上的透视角度
-  function millBlades(m) {
+  // 风车叶片：正面画的叶片在自己的平面里转，平面用真 3D（rotateY + 透视）转到房子侧面的角度，
+  // 再 skewY 贴合等距视角；背后叠一层压暗的叶片当木框厚度，另一份投影只落在房子轮廓里（用房子图当遮罩）
+  function millBlades(m, houseImg) {
     const layer = document.createElement("div");
     layer.className = "house-mill";
-    const [a, b, c, d] = m.matrix;
-    layer.innerHTML = `<div class="mill-plane" style="left:${m.x * 100}%;top:${m.y * 100}%;width:${m.size * 100}%;
-      transform:translate(-50%,-50%) matrix(${a},${b},${c},${d},0,0)"><img alt="" draggable="false"
-      style="animation-duration:${m.spin}s" /></div>`;
-    lazySrc(layer.querySelector("img"), m.img);
+    layer.style.perspectiveOrigin = `${m.x * 100}% ${m.y * 100}%`;
+    const pos = `left:${m.x * 100}%;top:${m.y * 100}%;width:${m.size * 100}%`;
+    const plane = `translate(-50%,-50%) skewY(${m.skew}deg) rotateY(${m.turn}deg)`;
+    const blade = (cls, z) =>
+      `<img class="${cls}" alt="" draggable="false" style="--z:${z}px;animation-duration:${m.spin}s" />`;
+    layer.innerHTML = `<div class="mill-shadow" style="-webkit-mask-image:url(${houseImg});mask-image:url(${houseImg});perspective-origin:${m.x * 100}% ${m.y * 100}%">
+        <div class="mill-plane" style="${pos};transform:translate(${m.shadow[0]}%,${m.shadow[1]}%) ${plane}">${blade("", 0)}</div>
+      </div>
+      <div class="mill-plane" style="${pos};transform:${plane}">${blade("mill-back", -m.depth)}${blade("mill-front", 0)}</div>`;
+    layer.querySelectorAll("img").forEach((img) => lazySrc(img, m.img));
     return layer;
   }
 
@@ -232,7 +238,7 @@
     img.alt = "";
     img.draggable = false;
     house.append(img);
-    if (site.mill) house.append(millBlades(site.mill));
+    if (site.mill) house.append(millBlades(site.mill, site.img));
     housesLayer.append(house);
     if (!linked) return;
 

@@ -405,20 +405,49 @@ html.rotated .viewport {
   transform-origin: 50% 90%;
 }
 
+.house-mill,
+.mill-shadow {
+  perspective: 160px;
+}
+
 .mill-plane {
   position: absolute;
   aspect-ratio: 1;
+  transform-style: preserve-3d;
 }
 
 .mill-plane img {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  filter: brightness(var(--obj-b)) saturate(var(--obj-s)) drop-shadow(0 2px 2px rgba(0, 40, 60, 0.25));
   animation: mill-spin 10s linear infinite;
 }
 
+.mill-front {
+  filter: brightness(var(--obj-b)) saturate(var(--obj-s));
+}
+
+/* 木框厚度：同一副叶片往后推几像素、压暗 */
+.mill-back {
+  filter: brightness(calc(var(--obj-b) * 0.45)) saturate(var(--obj-s));
+}
+
+/* 叶片投在塔身上的影子，跟着叶片一起转 */
+.mill-shadow {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  opacity: calc(0.38 * (1 - var(--night) * 0.6));
+}
+
+.mill-shadow img {
+  filter: brightness(0) blur(1.2px);
+}
+
 @keyframes mill-spin {
-  to { transform: rotate(360deg); }
+  from { transform: translateZ(var(--z)) rotate(0deg); }
+  to { transform: translateZ(var(--z)) rotate(360deg); }
 }
 
 .labels {
