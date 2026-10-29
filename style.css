@@ -390,8 +390,35 @@ html.rotated .viewport {
   transform-origin: 50% 90%;
 }
 
-.house.hover .house-lit {
+.house.hover .house-lit,
+.house.hover .house-mill {
   transform: scale(1.12) translateY(-3px);
+}
+
+/* 风车叶片层：盖在亮灯窗户上面，跟房子一起缩放、一起变暗 */
+.house-mill {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: 50% 90%;
+}
+
+.mill-plane {
+  position: absolute;
+  aspect-ratio: 1;
+}
+
+.mill-plane img {
+  display: block;
+  width: 100%;
+  filter: brightness(var(--obj-b)) saturate(var(--obj-s)) drop-shadow(0 2px 2px rgba(0, 40, 60, 0.25));
+  animation: mill-spin 10s linear infinite;
+}
+
+@keyframes mill-spin {
+  to { transform: rotate(360deg); }
 }
 
 .labels {
@@ -908,6 +935,7 @@ html.rotated .viewport {
   .boat-inner img,
   .boat-wake,
   .ripple,
+  .mill-plane img,
   .wx-rays i {
     animation-play-state: paused;
   }
