@@ -203,22 +203,70 @@
     return a;
   }
 
-  // 风车叶片：正面画的叶片在自己的平面里转，平面用真 3D（rotateY + 透视）转到房子侧面的角度，
-  // 再 skewY 贴合等距视角；背后叠一层压暗的叶片当木框厚度，另一份投影只落在房子轮廓里（用房子图当遮罩）
+  // 风车叶片（实时 3D）：叶片平面用 rotateY + 透视转到房子侧面的角度，再 skewY 贴合等距视角；
+  // 四片叶片各自沿长轴扭一个桨距角（真风车的帆是斜的），每帧按叶片当前朝向和左上方光源算明暗；
+  // 每片背后叠一层压暗的同形叶片当木框厚度，轮毂盖凸在最前面；投影用房子图当遮罩，只落在房子上
+  const mills = [];
+  const ARMS = [
+    [0, "50% 50%, 0 0, 100% 0"],
+    [90, "50% 50%, 100% 0, 100% 100%"],
+    [180, "50% 50%, 100% 100%, 0 100%"],
+    [270, "50% 50%, 0 100%, 0 0"],
+  ];
   function millBlades(m, houseImg) {
     const layer = document.createElement("div");
     layer.className = "house-mill";
-    layer.style.perspectiveOrigin = `${m.x * 100}% ${m.y * 100}%`;
+    const origin = `${m.x * 100}% ${m.y * 100}%`;
+    layer.style.perspectiveOrigin = origin;
     const pos = `left:${m.x * 100}%;top:${m.y * 100}%;width:${m.size * 100}%`;
     const plane = `translate(-50%,-50%) skewY(${m.skew}deg) rotateY(${m.turn}deg)`;
-    const blade = (cls, z) =>
-      `<img class="${cls}" alt="" draggable="false" style="--z:${z}px;animation-duration:${m.spin}s" />`;
-    layer.innerHTML = `<div class="mill-shadow" style="-webkit-mask-image:url(${houseImg});mask-image:url(${houseImg});perspective-origin:${m.x * 100}% ${m.y * 100}%">
-        <div class="mill-plane" style="${pos};transform:translate(${m.shadow[0]}%,${m.shadow[1]}%) ${plane}">${blade("", 0)}</div>
+    const img = (cls, style = "") => `<img class="${cls}" alt="" draggable="false" style="${style}" />`;
+    const arms = ARMS.map(
+      ([a, clip]) => `<div class="mill-arm" style="transform:rotate(${a}deg) rotateY(${m.pitch}deg) rotate(${-a}deg)">
+        ${img("mill-back", `clip-path:polygon(${clip});transform:translateZ(${-m.depth}px)`)}
+        ${img("mill-front", `clip-path:polygon(${clip})`)}</div>`
+    ).join("");
+    layer.innerHTML = `<div class="mill-shadow" style="-webkit-mask-image:url(${houseImg});mask-image:url(${houseImg});perspective-origin:${origin}">
+        <div class="mill-plane" style="${pos};transform:translate(${m.shadow[0]}%,${m.shadow[1]}%) ${plane}">
+          <div class="mill-rotor">${img("")}</div></div>
       </div>
-      <div class="mill-plane" style="${pos};transform:${plane}">${blade("mill-back", -m.depth)}${blade("mill-front", 0)}</div>`;
-    layer.querySelectorAll("img").forEach((img) => lazySrc(img, m.img));
+      <div class="mill-plane" style="${pos};transform:${plane}">
+        <div class="mill-rotor">${arms}${img("mill-hub", `transform:translateZ(${m.depth}px)`)}</div>
+      </div>`;
+    layer.querySelectorAll("img").forEach((el) => lazySrc(el, m.img));
+    mills.push({
+      m,
+      rotors: [...layer.querySelectorAll(".mill-rotor")],
+      arms: [...layer.querySelectorAll(".mill-arm .mill-front")].map((el, i) => ({ el, a: ARMS[i][0] })),
+    });
     return layer;
+  }
+
+  // 光从左上前方来；n 是叶片法线：先按桨距朝叶片侧向歪，再随叶片平面绕竖轴转 turn
+  const MILL_LIGHT = (() => {
+    const v = [-0.5, -0.6, 0.62];
+    const l = Math.hypot(...v);
+    return v.map((c) => c / l);
+  })();
+  function millFrame(mill, now) {
+    const { m } = mill;
+    const theta = reduceMotion ? 20 : ((now / 1000) * 360) / m.spin;
+    mill.rotors.forEach((r) => (r.style.transform = `rotate(${theta}deg)`));
+    const rad = Math.PI / 180;
+    const p = m.pitch * rad;
+    const t = m.turn * rad;
+    // 叶片平面本身（不扭）的受光作为基准，扭角带来的明暗差放大，转起来亮暗变化才明显
+    const base = Math.sin(t) * MILL_LIGHT[0] + Math.cos(t) * MILL_LIGHT[2];
+    mill.arms.forEach(({ el, a }) => {
+      const phi = (a + theta) * rad;
+      const nx = Math.sin(p) * Math.cos(phi);
+      const ny = Math.sin(p) * Math.sin(phi);
+      const nz = Math.cos(p);
+      const x = nx * Math.cos(t) + nz * Math.sin(t);
+      const z = -nx * Math.sin(t) + nz * Math.cos(t);
+      const dot = x * MILL_LIGHT[0] + ny * MILL_LIGHT[1] + z * MILL_LIGHT[2];
+      el.style.setProperty("--lit", Math.max(0.55, 1 + (dot - base) * 1.6).toFixed(3));
+    });
   }
 
   cfg.sites.forEach((site) => {
@@ -792,6 +840,7 @@
     });
     kids.forEach((kid) => kidFrame(kid, now));
     if (mapKid) bubbleFrame(mapKid, now);
+    mills.forEach((mill) => millFrame(mill, now));
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

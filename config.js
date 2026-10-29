@@ -17,10 +17,10 @@ window.MAP_CONFIG = {
     { name: "苹果ASO 🍎", url: "https://xiaobai-aso.github.io/", img: "assets/houses/house-2.webp", x: 285, y: 300, w: 112 },
     { name: "玩游戏 🎮", url: "https://xiaobai-kart.github.io/", img: "assets/houses/house-3.webp", x: 400, y: 238, w: 106,
       // 风车叶片：x / y 是轮轴在房子图里的位置（0~1），size 是叶片直径占房子宽度的比例，
-      // turn 是叶片平面朝左前方转的角度，skew 让它贴合等距视角，depth 是木框厚度（像素），
-      // shadow 是投在塔身上的影子偏移（占叶片大小的百分比），spin 是转一圈的秒数
+      // turn 是叶片平面朝左前方转的角度，skew 让它贴合等距视角，pitch 是每片叶片沿长轴扭的桨距角，
+      // depth 是木框厚度（像素），shadow 是投在塔身上的影子偏移（占叶片大小的百分比），spin 是转一圈的秒数
       mill: { img: "assets/houses/mill-blades.webp", x: 0.428, y: 0.282, size: 0.6,
-        turn: 52, skew: 20, depth: 2.5, shadow: [12, 6], spin: 10 } },
+        turn: -52, skew: 20, pitch: 16, depth: 2.5, shadow: [12, 6], spin: 10 } },
     { name: "搞钱吧 🤑", url: "https://xiaobai-shouxi.github.io/", img: "assets/houses/house-4.webp", x: 560, y: 248, w: 112 },
     { name: "小工具 🧰", url: "https://xiaobai-toolbox.github.io/", img: "assets/houses/house-5.webp", x: 735, y: 405, w: 112 },
     { img: "assets/houses/house-6.webp", x: 845, y: 300, w: 112 },

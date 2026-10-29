@@ -416,20 +416,32 @@ html.rotated .viewport {
   transform-style: preserve-3d;
 }
 
+.mill-rotor,
+.mill-arm {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
 .mill-plane img {
   position: absolute;
   inset: 0;
   width: 100%;
-  animation: mill-spin 10s linear infinite;
 }
 
+/* --lit 由 app.js 每帧按叶片朝向和光源算出来 */
 .mill-front {
-  filter: brightness(var(--obj-b)) saturate(var(--obj-s));
+  filter: brightness(calc(var(--obj-b) * var(--lit, 1))) saturate(var(--obj-s));
 }
 
-/* 木框厚度：同一副叶片往后推几像素、压暗 */
+/* 木框厚度：同一片叶片往后推几像素、压暗 */
 .mill-back {
-  filter: brightness(calc(var(--obj-b) * 0.45)) saturate(var(--obj-s));
+  filter: brightness(calc(var(--obj-b) * 0.42)) saturate(var(--obj-s));
+}
+
+.mill-hub {
+  clip-path: circle(7% at 50% 50%);
+  filter: brightness(calc(var(--obj-b) * 1.05)) saturate(var(--obj-s)) drop-shadow(0 0 1px rgba(60, 30, 10, 0.8));
 }
 
 /* 叶片投在塔身上的影子，跟着叶片一起转 */
@@ -443,11 +455,6 @@ html.rotated .viewport {
 
 .mill-shadow img {
   filter: brightness(0) blur(1.2px);
-}
-
-@keyframes mill-spin {
-  from { transform: translateZ(var(--z)) rotate(0deg); }
-  to { transform: translateZ(var(--z)) rotate(360deg); }
 }
 
 .labels {
@@ -964,7 +971,6 @@ html.rotated .viewport {
   .boat-inner img,
   .boat-wake,
   .ripple,
-  .mill-plane img,
   .wx-rays i {
     animation-play-state: paused;
   }
