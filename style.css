@@ -407,7 +407,7 @@ html.rotated .viewport {
 
 .house-mill,
 .mill-shadow {
-  perspective: 160px;
+  perspective: 420px;
 }
 
 .mill-plane {
