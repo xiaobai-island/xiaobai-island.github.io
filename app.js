@@ -4,6 +4,7 @@
   const viewport = document.getElementById("viewport");
   const stage = document.getElementById("stage");
   const world = document.getElementById("world");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   world.style.width = cfg.width + "px";
   world.style.height = cfg.height + "px";
@@ -206,6 +207,8 @@
   // 风车叶片（实时 3D）：叶片平面用 rotateY + 透视转到房子侧面的角度，再 skewY 贴合等距视角；
   // 四片叶片各自沿长轴扭一个桨距角（真风车的帆是斜的），每帧按叶片当前朝向和左上方光源算明暗；
   // 每片背后叠一层压暗的同形叶片当木框厚度，轮毂盖凸在最前面；投影用房子图当遮罩，只落在房子上
+  // 转动交给浏览器合成线程（主线程卡住也照样匀速转）；明暗不改 filter（每帧都要重绘），
+  // 而是在叶片上叠一张纯黑、一张提亮到最亮档的同形叶片，只调这两张的透明度，叠出来和 brightness 一样
   const mills = [];
   const ARMS = [
     [0, "50% 50%, 0 0, 100% 0"],
@@ -221,11 +224,14 @@
     const pos = `left:${m.x * 100}%;top:${m.y * 100}%;width:${m.size * 100}%`;
     const plane = `translate(-50%,-50%) skewY(${m.skew}deg) rotateY(${m.turn}deg)`;
     const img = (cls, style = "") => `<img class="${cls}" alt="" draggable="false" style="${style}" />`;
-    const arms = ARMS.map(
-      ([a, clip]) => `<div class="mill-arm" style="transform:rotate(${a}deg) rotateY(${m.pitch}deg) rotate(${-a}deg)">
-        ${img("mill-back", `clip-path:polygon(${clip});transform:translateZ(${-m.depth}px)`)}
-        ${img("mill-front", `clip-path:polygon(${clip})`)}</div>`
-    ).join("");
+    const arms = ARMS.map(([a, clip]) => {
+      const c = `clip-path:polygon(${clip})`;
+      return `<div class="mill-arm" style="transform:rotate(${a}deg) rotateY(${m.pitch}deg) rotate(${-a}deg)">
+        ${img("mill-back", `${c};transform:translateZ(${-m.depth}px)`)}
+        <div class="mill-face">${img("mill-front", c)}${img("mill-dim", c)}${img("mill-glow", c)}</div></div>`;
+    }).join("");
+    const litMax = Math.max(1.001, ...Array.from({ length: 360 }, (_, i) => millLit(m, i)));
+    layer.style.setProperty("--lit-max", litMax.toFixed(3));
     layer.innerHTML = `<div class="mill-shadow" style="-webkit-mask-image:url(${houseImg});mask-image:url(${houseImg});perspective-origin:${origin}">
         <div class="mill-plane" style="${pos};transform:translate(${m.shadow[0]}%,${m.shadow[1]}%) ${plane}">
           <div class="mill-rotor">${img("")}</div></div>
@@ -234,10 +240,27 @@
         <div class="mill-rotor">${arms}${img("mill-hub", `transform:translateZ(${m.depth}px)`)}</div>
       </div>`;
     layer.querySelectorAll("img").forEach((el) => lazySrc(el, m.img));
+    layer.querySelectorAll(".mill-rotor").forEach((r) => {
+      if (reduceMotion) {
+        r.style.transform = "rotate(20deg)";
+        return;
+      }
+      const spin = r.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }], {
+        duration: m.spin * 1000,
+        iterations: Infinity,
+      });
+      // 从时间轴原点起转，角度 = now / spin，和逐帧算明暗用的是同一个时钟
+      spin.startTime = 0;
+    });
     mills.push({
       m,
-      rotors: [...layer.querySelectorAll(".mill-rotor")],
-      arms: [...layer.querySelectorAll(".mill-arm .mill-front")].map((el, i) => ({ el, a: ARMS[i][0] })),
+      litMax,
+      arms: [...layer.querySelectorAll(".mill-face")].map((face, i) => ({
+        dim: face.querySelector(".mill-dim"),
+        glow: face.querySelector(".mill-glow"),
+        a: ARMS[i][0],
+        last: "",
+      })),
     });
     return layer;
   }
@@ -248,24 +271,35 @@
     const l = Math.hypot(...v);
     return v.map((c) => c / l);
   })();
-  function millFrame(mill, now) {
-    const { m } = mill;
-    const theta = reduceMotion ? 20 : ((now / 1000) * 360) / m.spin;
-    mill.rotors.forEach((r) => (r.style.transform = `rotate(${theta}deg)`));
+  // 叶片转到 angle 度时的亮度倍数（1 是原图亮度）
+  function millLit(m, angle) {
     const rad = Math.PI / 180;
     const p = m.pitch * rad;
     const t = m.turn * rad;
     // 叶片平面本身（不扭）的受光作为基准，扭角带来的明暗差放大，转起来亮暗变化才明显
     const base = Math.sin(t) * MILL_LIGHT[0] + Math.cos(t) * MILL_LIGHT[2];
-    mill.arms.forEach(({ el, a }) => {
-      const phi = (a + theta) * rad;
-      const nx = Math.sin(p) * Math.cos(phi);
-      const ny = Math.sin(p) * Math.sin(phi);
-      const nz = Math.cos(p);
-      const x = nx * Math.cos(t) + nz * Math.sin(t);
-      const z = -nx * Math.sin(t) + nz * Math.cos(t);
-      const dot = x * MILL_LIGHT[0] + ny * MILL_LIGHT[1] + z * MILL_LIGHT[2];
-      el.style.setProperty("--lit", Math.max(0.55, 1 + (dot - base) * 1.6).toFixed(3));
+    const phi = angle * rad;
+    const nx = Math.sin(p) * Math.cos(phi);
+    const ny = Math.sin(p) * Math.sin(phi);
+    const nz = Math.cos(p);
+    const x = nx * Math.cos(t) + nz * Math.sin(t);
+    const z = -nx * Math.sin(t) + nz * Math.cos(t);
+    const dot = x * MILL_LIGHT[0] + ny * MILL_LIGHT[1] + z * MILL_LIGHT[2];
+    return Math.max(0.55, 1 + (dot - base) * 1.6);
+  }
+
+  // 变暗：盖黑色叶片，透明度 1 - 亮度；变亮：盖最亮档叶片，按亮度在原图和最亮档之间插值
+  function millFrame(mill, now) {
+    const theta = reduceMotion ? 20 : ((now / 1000) * 360) / mill.m.spin;
+    mill.arms.forEach((arm) => {
+      const lit = millLit(mill.m, arm.a + theta);
+      const dim = Math.max(0, 1 - lit).toFixed(3);
+      const glow = Math.max(0, (lit - 1) / (mill.litMax - 1)).toFixed(3);
+      const key = dim + glow;
+      if (key === arm.last) return;
+      arm.last = key;
+      arm.dim.style.opacity = dim;
+      arm.glow.style.opacity = glow;
     });
   }
 
@@ -358,13 +392,26 @@
     };
   }
 
+  // 小孩和房子按 y 排前后；z-index 吸附到「脚下以北最近那栋房子」的值，前后关系和直接用 y 一样，
+  // 但只在跨过某栋房子时才变，不用每走一步都重排
+  const houseZ = cfg.sites.map((s) => Math.round(s.y)).sort((a, b) => a - b);
+  function kidZ(y) {
+    const v = Math.round(y);
+    let z = houseZ[0] - 1;
+    for (const h of houseZ) if (h <= v) z = h;
+    return z;
+  }
+
+  // 用 translate 而不是 left / top 移动：不触发重新布局，配合 will-change 只在合成层上挪位置
   function putKid(kid, x, y) {
     kid.x = x;
     kid.y = y;
-    kid.el.style.left = x + "px";
-    kid.el.style.top = y + "px";
+    kid.el.style.translate = `${x}px ${y}px`;
     // 回家路上脚会走到房子底边以上，按 y 排序会被房子挡住，所以临时提到房子前面
-    kid.el.style.zIndex = kid.zLift || Math.round(y);
+    const z = kid.zLift || kidZ(y);
+    if (kid.z === z) return;
+    kid.z = z;
+    kid.el.style.zIndex = z;
   }
 
   const kids = [];
@@ -527,6 +574,7 @@
   const bubble = document.createElement("div");
   bubble.className = "kid-bubble";
   labelsLayer.append(bubble);
+  let bubblePos = "";
   let sayUntil = 0;
   let nextSay = performance.now() + 2500;
   let lastLine = "";
@@ -563,8 +611,10 @@
     }
     if (now >= nextSay) sayNow(kid);
     else if (now >= sayUntil) bubble.classList.remove("show");
-    bubble.style.left = kid.x + "px";
-    bubble.style.top = kid.y - cfg.kid.h - 10 + "px";
+    const pos = `calc(${kid.x}px - 50%) calc(${kid.y - cfg.kid.h - 10}px - 100%)`;
+    if (pos === bubblePos) return;
+    bubblePos = pos;
+    bubble.style.translate = pos;
   }
 
   // 绳子绕身体转一圈 560ms，往下甩时在身前、往上甩时在身后；绳子到脚下时人正好跳到最高
@@ -691,23 +741,35 @@
   const sailing = boats.filter((boat, i) => {
     if (boat.segs.length) return true;
     const [x, y] = cfg.boats[i].route[0];
+    boat.y = y;
     boat.el.style.transform = `translate(${x}px, ${y}px) scale(${boatScale(boat, y)})`;
-    boat.el.style.zIndex = Math.round(y);
     return false;
   });
 
+  // 船之间按 y 排前后（靠下的在前）；只在先后顺序变了时才改 z-index，不每帧触发重排
+  function sortBoats() {
+    boats
+      .slice()
+      .sort((a, b) => a.y - b.y)
+      .forEach((boat, i) => {
+        if (boat.z === i + 1) return;
+        boat.z = i + 1;
+        boat.el.style.zIndex = i + 1;
+      });
+  }
+
   // 船头兴波：每走一小段在船头吃水处留下左右两道波线，波线停在水面上各自向外推开，
   // 船继续往前走，这些波线就沿船身排成向后张开的 V 形尾迹；地图是斜俯视，垂直航向的位移压扁一半
+  // 波线画在船下面的一张画布上，不再每道波线建一个 DOM 元素
   const WAKE_STEP = 4;
   const BOAT_TILT = 12;
   const MAX_RIPPLES = 120;
   const WAKE_MS = 2600;
   const WAKE_OPEN = 16;
-  let ripples = 0;
-  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let wakes = [];
   // 波线从画面上看得见的船头出发（船图只有侧视，竖着走时也按船头朝向和倾角算），向真实航向的后方推开
-  function spawnRipple(boat, x, y, ux, uy, s) {
-    if (reduceMotion || ripples >= MAX_RIPPLES || x < -20 || x > cfg.width + 20) return;
+  function spawnRipple(boat, x, y, ux, uy, s, now) {
+    if (reduceMotion || wakes.length >= MAX_RIPPLES || x < -20 || x > cfg.width + 20) return;
     const len = boat.w * s;
     const bow = boat.bowDir;
     const tiltRad = (boat.tilt * Math.PI) / 180;
@@ -715,30 +777,117 @@
     const by = y + bow * len * 0.4 * Math.sin(tiltRad);
     const heading = boat.tilt + (bow < 0 ? 180 : 0);
     for (const side of [-1, 1]) {
-      const px = -uy * side * len * 0.3 - ux * len * 1.0;
-      const py = (ux * side * len * 0.3 - uy * len * 1.0) * 0.5;
-      const r = document.createElement("i");
-      r.className = "ripple";
-      r.style.left = bx + "px";
-      r.style.top = by + "px";
-      r.style.width = len * 0.3 + "px";
-      r.style.zIndex = 0;
-      const rot = heading - side * WAKE_OPEN;
-      const flipArc = side > 0 ? " scaleY(-1)" : "";
-      ripples++;
-      r.animate(
-        [
-          { transform: `translate(0, 0) rotate(${rot}deg) scale(0.5)${flipArc}`, opacity: 0.95 },
-          { transform: `translate(${px * 0.35}px, ${py * 0.35}px) rotate(${rot}deg) scale(1)${flipArc}`, opacity: 0.8, offset: 0.25 },
-          { transform: `translate(${px}px, ${py}px) rotate(${rot}deg) scale(1.9)${flipArc}`, opacity: 0 },
-        ],
-        { duration: WAKE_MS, easing: "ease-out", fill: "forwards" }
-      ).onfinish = () => {
-        r.remove();
-        ripples--;
-      };
-      boatsLayer.append(r);
+      wakes.push({
+        x: bx,
+        y: by,
+        px: -uy * side * len * 0.3 - ux * len * 1.0,
+        py: (ux * side * len * 0.3 - uy * len * 1.0) * 0.5,
+        rot: ((heading - side * WAKE_OPEN) * Math.PI) / 180,
+        flip: side > 0 ? -1 : 1,
+        w: len * 0.3,
+        t0: now,
+      });
     }
+  }
+
+  const wakeCanvas = document.createElement("canvas");
+  wakeCanvas.className = "boat-wakes";
+  boatsLayer.prepend(wakeCanvas);
+  const wctx = wakeCanvas.getContext("2d");
+  let wakeRes = 0;
+  let wakeBox = null;
+  let wakeAlpha = 0.95;
+  let nightAt = 0;
+  // 波线带光晕的样子按宽度（0.5px 一档）和颜色预先画成小图，每帧只贴图，不再逐条算模糊
+  let wakeSprites = new Map();
+  const WAKE_PAD = 3;
+  function wakeSprite(w) {
+    const key = `${w}|${wakeAlpha}`;
+    let sp = wakeSprites.get(key);
+    if (sp) return sp;
+    const S = wakeRes * 1.9;
+    sp = document.createElement("canvas");
+    sp.width = Math.ceil((w + WAKE_PAD * 2) * S);
+    sp.height = Math.ceil((5 + WAKE_PAD * 2) * S);
+    const c = sp.getContext("2d");
+    c.setTransform(S, 0, 0, S, (w / 2 + WAKE_PAD) * S, (2.5 + WAKE_PAD) * S);
+    c.fillStyle = `rgba(255,255,255,${wakeAlpha})`;
+    c.shadowColor = "rgba(255,255,255,0.6)";
+    c.shadowBlur = 1.5 * S;
+    c.beginPath();
+    c.ellipse(0, 0, w / 2, 2.5, 0, Math.PI, Math.PI * 2);
+    c.ellipse(0, 0, w / 2, 0.5, 0, Math.PI * 2, Math.PI, true);
+    c.fill();
+    wakeSprites.set(key, sp);
+    return sp;
+  }
+
+  // CSS 的 ease-out，即 cubic-bezier(0, 0, 0.58, 1)
+  function easeOut(x) {
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const u = 1 - t;
+      const dx = 3 * 0.58 * t * t * u + t * t * t - x;
+      if (Math.abs(dx) < 1e-5) break;
+      t = Math.min(1, Math.max(0, t - dx / (6 * 0.58 * t * u + 3 * 0.42 * t * t || 1e-6)));
+    }
+    const u = 1 - t;
+    return 3 * t * t * u + t * t * t;
+  }
+
+  // 每道波线是一条上边粗、两头尖的细弧（宽 w、高 5、描边 2，带 1.5px 白色光晕），
+  // 0 → 25% → 100% 三段：位移 0 → 0.35 → 1，缩放 0.5 → 1 → 1.9，透明度 0.95 → 0.8 → 0
+  function drawWakes(now) {
+    const W = cfg.width;
+    const H = cfg.height;
+    const zoom = parseFloat(world.style.zoom) || 1;
+    const res = Math.min(zoom * Math.min(devicePixelRatio || 1, 2), Math.sqrt(4.5e6 / (W * H)));
+    if (Math.abs(res - wakeRes) > 0.01) {
+      wakeRes = res;
+      wakeCanvas.width = Math.round(W * res);
+      wakeCanvas.height = Math.round(H * res);
+      wakeSprites = new Map();
+      wakeBox = null;
+    }
+    wakes = wakes.filter((w) => now - w.t0 < WAKE_MS);
+    if (!wakes.length && !wakeBox) return;
+    wctx.setTransform(wakeRes, 0, 0, wakeRes, 0, 0);
+    // 只擦上一帧画过的范围
+    if (wakeBox) wctx.clearRect(wakeBox[0], wakeBox[1], wakeBox[2] - wakeBox[0], wakeBox[3] - wakeBox[1]);
+    wakeBox = null;
+    if (!wakes.length) return;
+    if (now >= nightAt) {
+      nightAt = now + 250;
+      const night = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--night")) || 0;
+      const a = Math.round((0.95 - night * 0.45) * 40) / 40;
+      if (a !== wakeAlpha) {
+        wakeAlpha = a;
+        wakeSprites = new Map();
+      }
+    }
+    const box = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const w of wakes) {
+      const p = easeOut((now - w.t0) / WAKE_MS);
+      const q = p < 0.25 ? p / 0.25 : (p - 0.25) / 0.75;
+      const k = p < 0.25 ? 0.35 * q : 0.35 + 0.65 * q;
+      const sc = p < 0.25 ? 0.5 + 0.5 * q : 1 + 0.9 * q;
+      const cx = w.x + w.px * k;
+      const cy = w.y + w.py * k;
+      const ww = Math.max(0.5, Math.round(w.w * 2) / 2);
+      const reach = (Math.max(ww / 2, 2.5) + WAKE_PAD) * sc + 1;
+      box[0] = Math.min(box[0], cx - reach);
+      box[1] = Math.min(box[1], cy - reach);
+      box[2] = Math.max(box[2], cx + reach);
+      box[3] = Math.max(box[3], cy + reach);
+      wctx.globalAlpha = p < 0.25 ? 0.95 - 0.15 * q : 0.8 * (1 - q);
+      wctx.setTransform(wakeRes, 0, 0, wakeRes, 0, 0);
+      wctx.translate(cx, cy);
+      wctx.rotate(w.rot);
+      wctx.scale(sc, sc * w.flip);
+      wctx.drawImage(wakeSprite(ww), -(ww / 2 + WAKE_PAD), -(2.5 + WAKE_PAD), ww + WAKE_PAD * 2, 5 + WAKE_PAD * 2);
+    }
+    wctx.globalAlpha = 1;
+    wakeBox = box;
   }
 
   // ---------- 启动画面：小孩跳绳等加载，素材全部到齐或最多 5 秒后淡出 ----------
@@ -831,13 +980,15 @@
       const tiltTo = boat.bowDir * uy * BOAT_TILT;
       boat.tilt += (tiltTo - boat.tilt) * Math.min(1, dt * 2);
       boat.el.style.transform = `translate(${x}px, ${y}px) rotate(${boat.tilt}deg) scale(${s})`;
-      boat.el.style.zIndex = Math.round(y);
+      boat.y = y;
       boat.wakeGap += boat.speed * dt;
       if (boat.wakeGap >= WAKE_STEP) {
         boat.wakeGap = 0;
-        spawnRipple(boat, x, y, ux, uy, s);
+        spawnRipple(boat, x, y, ux, uy, s, now);
       }
     });
+    sortBoats();
+    drawWakes(now);
     kids.forEach((kid) => kidFrame(kid, now));
     if (mapKid) bubbleFrame(mapKid, now);
     mills.forEach((mill) => millFrame(mill, now));

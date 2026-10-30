@@ -340,12 +340,20 @@
     });
   }
 
+  // 画布上一帧有没有画东西：这一帧也没东西可画时，空画布不用每帧再清
+  let backDirty = true;
+  let frontDirty = true;
+
   function drawBack(t, dt) {
+    const n = level.night;
+    const idle = n <= 0.01 && (level.sunny <= 0.01 || reduce) && !ripples.length;
+    if (idle && !backDirty) return;
+    backDirty = !idle;
     bctx.setTransform(res, 0, 0, res, 0, 0);
     bctx.clearRect(0, 0, W, H);
+    if (idle) return;
     bctx.globalCompositeOperation = "lighter";
 
-    const n = level.night;
     if (n > 0.01) {
       stars.forEach((s) => {
         const tw = reduce ? 1 : 0.55 + 0.45 * Math.sin(t * s.f + s.p);
@@ -440,12 +448,16 @@
   }
 
   function drawFront(dt) {
-    fctx.setTransform(res, 0, 0, res, 0, 0);
-    fctx.clearRect(0, 0, W, H);
-    if (reduce) return;
-
     const r = level.rain;
     const nRain = Math.round(drops.length * r * quality);
+    const nSnowNow = Math.round(flakes.length * level.snow * quality);
+    const idle = reduce || (nRain <= 0 && nSnowNow <= 0 && !splashes.length);
+    if (idle && !frontDirty) return;
+    frontDirty = !idle;
+    fctx.setTransform(res, 0, 0, res, 0, 0);
+    fctx.clearRect(0, 0, W, H);
+    if (idle) return;
+
     if (nRain > 0) {
       fctx.lineCap = "round";
       // 按远近分三档，每档一条路径一次画完

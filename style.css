@@ -429,9 +429,28 @@ html.rotated .viewport {
   width: 100%;
 }
 
-/* --lit 由 app.js 每帧按叶片朝向和光源算出来 */
+.mill-face {
+  position: absolute;
+  inset: 0;
+}
+
 .mill-front {
-  filter: brightness(calc(var(--obj-b) * var(--lit, 1))) saturate(var(--obj-s));
+  filter: brightness(var(--obj-b)) saturate(var(--obj-s));
+}
+
+/* 叶片明暗：app.js 每帧只改这两张的透明度。黑色那张压暗，--lit-max 那张提亮到转一圈里最亮的那一档 */
+.mill-dim,
+.mill-glow {
+  opacity: 0;
+  will-change: opacity;
+}
+
+.mill-dim {
+  filter: brightness(0);
+}
+
+.mill-glow {
+  filter: brightness(calc(var(--obj-b) * var(--lit-max))) saturate(var(--obj-s));
 }
 
 /* 木框厚度：同一片叶片往后推几像素、压暗 */
@@ -581,7 +600,11 @@ html.rotated .viewport {
   pointer-events: none;
 }
 
+/* 地图上的小孩由 app.js 用 translate 定位；单独一个合成层，走动、跳绳时不用连带重画后面的房子 */
 .houses .kid {
+  left: 0;
+  top: 0;
+  will-change: transform;
   filter: brightness(var(--obj-b)) saturate(var(--obj-s));
 }
 
@@ -687,10 +710,13 @@ html.rotated .viewport {
   stroke-width: 2.8;
 }
 
-/* 小孩头顶的话：白色圆角气泡，下面两个小圆点当尾巴 */
+/* 小孩头顶的话：白色圆角气泡，下面两个小圆点当尾巴；跟着小孩走时 app.js 改的是 translate */
 .kid-bubble {
   position: absolute;
+  left: 0;
+  top: 0;
   translate: -50% -100%;
+  will-change: transform;
   padding: 3px 7px;
   border-radius: 9px;
   background: #fff;
@@ -944,14 +970,12 @@ html.rotated .viewport {
   animation: wake 2.6s ease-in-out infinite;
 }
 
-/* 船尾留下的水波纹：扁椭圆细圈，向外扩散并淡出 */
-.ripple {
+/* 船尾留下的水波纹由 app.js 画在这张画布上，在所有船下面 */
+.boat-wakes {
   position: absolute;
-  height: 5px;
-  border-top: 2px solid rgba(255, 255, 255, calc(0.95 - var(--night) * 0.45));
-  border-radius: 50%;
-  filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.6));
-  translate: -50% -50%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 
@@ -970,7 +994,6 @@ html.rotated .viewport {
   .house-label,
   .boat-inner img,
   .boat-wake,
-  .ripple,
   .wx-rays i {
     animation-play-state: paused;
   }
