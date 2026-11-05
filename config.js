@@ -30,7 +30,7 @@ window.MAP_CONFIG = {
   // 只出现在简洁导航页、地图上没有房子的入口，写法同上（name 末尾 emoji 当图标，desc 可选）
   navExtra: [
     { name: "学英语 📖", url: "https://xiaobai-english.github.io/", desc: "词光 · 雅思词汇" },
-    { name: "订阅页 💳", url: "https://xiaobai-paywall.github.io/", desc: "iOS / GP 订阅页方案库" },
+    { name: "订阅页 📱", url: "https://xiaobai-paywall.github.io/", desc: "iOS / GP 订阅页方案库" },
   ],
 
   // 跳绳的小孩：x / y 是脚底落点，h 是人物显示高度；home 是天黑时走进去的门口（苹果ASO 那栋房子）
