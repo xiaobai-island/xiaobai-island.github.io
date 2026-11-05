@@ -145,6 +145,7 @@
   }
 
   rotateBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+  document.getElementById("navBtn").addEventListener("pointerdown", (e) => e.stopPropagation());
   rotateBtn.addEventListener("click", () => (rotated || locked ? exitLandscape() : enterLandscape()));
   document.addEventListener("fullscreenchange", () => {
     if (!document.fullscreenElement && locked) {
