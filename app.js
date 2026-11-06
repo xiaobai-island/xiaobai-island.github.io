@@ -103,6 +103,22 @@
   window.addEventListener("resize", fit);
   fit();
 
+  // ---------- 简易导航 / 地图：地址带 #island 显示地图，否则显示导航，地图在下面后台加载 ----------
+
+  const root = document.documentElement;
+  const isNav = () => root.classList.contains("nav-mode");
+  function applyMode() {
+    const nav = location.hash !== "#island";
+    root.classList.toggle("nav-mode", nav);
+    viewport.inert = nav;
+    if (!nav) {
+      fit();
+      injectExtras();
+    }
+  }
+  addEventListener("hashchange", applyMode);
+  viewport.inert = isNav();
+
   // ---------- 手机横屏 ----------
   // 支持的浏览器（安卓 Chrome 等）进入全屏并锁定横屏；不支持的（iPhone）把整个页面用 CSS 转 90°，手机横过来看
 
@@ -893,8 +909,34 @@
 
   // ---------- 启动画面：小孩跳绳等加载，素材全部到齐或最多 5 秒后淡出 ----------
 
+  const SPLASH_MAX = 5000;
+
+  // 从简易导航进来不放启动画面，加载进度画在「进入小白岛」按钮底下
+  function navProgress() {
+    const enter = document.getElementById("navEnter");
+    const bar = enter.querySelector("i");
+    let done = 0;
+    const total = loads.length || 1;
+    loads.forEach((p) =>
+      p.then(() => {
+        done++;
+        bar.style.width = (done / total) * 100 + "%";
+      })
+    );
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      bar.style.width = "100%";
+      enter.classList.add("ready");
+      loadExtras();
+    };
+    Promise.all(loads).then(finish);
+    setTimeout(finish, SPLASH_MAX);
+  }
+
   (function splash() {
-    const SPLASH_MAX = 5000;
+    if (isNav()) return navProgress();
     const SPLASH_MIN = 900;
     const start = performance.now();
 
@@ -949,15 +991,31 @@
 
   // ---------- 天气等装饰效果：页面加载完、启动画面关掉后，趁浏览器空闲再加载，不占首屏 ----------
 
+  // 停在简易导航时只把 weather.js 预先下载好，真正进地图再执行（它有自己的逐帧动画，还会去查实时天气）
+  let extrasReady = false;
+  let extrasInjected = false;
+  function injectExtras() {
+    if (!extrasReady || extrasInjected || isNav()) return;
+    extrasInjected = true;
+    const s = document.createElement("script");
+    s.src = "weather.js" + VERSION;
+    s.async = true;
+    document.body.append(s);
+  }
+
   function loadExtras() {
-    const inject = () => {
-      const s = document.createElement("script");
-      s.src = "weather.js" + VERSION;
-      s.async = true;
-      document.body.append(s);
+    const ready = () => {
+      extrasReady = true;
+      if (isNav()) {
+        const pre = document.createElement("link");
+        pre.rel = "prefetch";
+        pre.href = "weather.js" + VERSION;
+        document.head.append(pre);
+      }
+      injectExtras();
     };
     const whenIdle = () =>
-      window.requestIdleCallback ? requestIdleCallback(inject, { timeout: 3000 }) : setTimeout(inject, 500);
+      window.requestIdleCallback ? requestIdleCallback(ready, { timeout: 3000 }) : setTimeout(ready, 500);
     document.readyState === "complete" ? whenIdle() : addEventListener("load", whenIdle, { once: true });
   }
 
@@ -965,6 +1023,11 @@
   function tick(now) {
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
+    // 简易导航盖住地图时跳过逐帧计算，只留浏览器自己跑的 CSS 动画
+    if (isNav()) {
+      requestAnimationFrame(tick);
+      return;
+    }
     sailing.forEach((boat) => {
       boat.dist = (boat.dist + boat.speed * dt) % (boat.total * 2);
       const back = boat.dist > boat.total;

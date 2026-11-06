@@ -12,7 +12,7 @@ window.MAP_CONFIG = {
   safe: { x0: 20, y0: 20, x1: 1004, y1: 515 },
 
   // 有 name 和 url 的房子会显示名称牌并可点击；不填就只是装饰
-  // 这些房子也会列在简洁导航页 nav.html 里：名称末尾的 emoji 当图标，可选 desc 当副标题（不填显示域名）
+  // 这些房子也会列在首页默认显示的简易导航里：名称末尾的 emoji 当图标，可选 desc 当副标题（不填显示域名）
   sites: [
     { img: "assets/houses/house-1.webp", x: 160, y: 262, w: 112 },
     { name: "苹果ASO 🍎", url: "https://xiaobai-aso.github.io/", img: "assets/houses/house-2.webp", x: 285, y: 300, w: 112 },

@@ -7,19 +7,23 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="preload" as="image" href="assets/map-bg-1600.webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/map-bg-1600.webp" />
+  <script>
+    // 默认先给简易导航，地址带 #island 才直接进地图；在这里加 class，首屏不会闪一下地图
+    if (location.hash !== "#island") document.documentElement.classList.add("nav-mode");
+  </script>
   <style>
     /* 48px 宽的模糊占位图，底图下载完之前先显示岛的轮廓 */
     :root { --lqip: url("data:image/webp;base64,UklGRqoCAABXRUJQVlA4IJ4CAADQDACdASowABsAPqU+l0mmIyIhNUgAwBSJbACdMoRz7tV9gSksJLqq+oDbRfrl6gP2Q6jW8Z+gB0l/ld1hrltAsq9HchGNX2txcCPLeRTd34yq8IdzL0KNS/jGouF6fZnNfXIr48C1ibXP7Jwi7MAA/mFhzMgr1lmOHZpMQGl7PaHBeBF9Y1gmfvUTLA1VSEvIpOZPj7Tw2ptS4bp0/CKctKRpYLWmObtJQ/G5wcO/1zvEQ/jW/Cdr/7FjXMlXGyf7qA6MXQ7EUhhwM3kyjIYd58nMAXMXEvRnE3TJEbY77z2IHbRzeHf8S02m1e3qoxqmw9sew/9oRsPQkEweOsaIGgTW7e2HnQbKydt+jU/0dVewL6qpgRvjFywQ5O6UdLjsZ4rKD3UJPqK24Qb9KufnHG8xImBDnMJZL7SV/6MyNK3tHRGVmJPSsYkq6URmlYseTSz2s9vW9MDRghA1po51CEdLR7Xw7R2myxoOtJvf3h9Geej/vIGRK0rqC3w1/LPZNBbzQaIGy87YfNELMIiP09VxtJJEGuNY0baVGI0/9Uer7qlYiBEZeY8axuhtoHVIXcVE4btjbdP4rRF/kSoTvp/xwOQFBKogW+PjuC2P187lX7/ChqHd7s7l+u6DLuj+WCF+jtuZ7fHDFOXDxFuC3sHhHmxROwNNgZM7rP/X63ekb94+e7JJxyPeXnf55iKV9TAaD/xJG06h48qrsY+54OLir26HUHgPq+OL6OAvXH+dPJTYUOEwOfpJSmNXtO1Uv43slFwa32/5WQIKSF0kiPKyRLaqviZ8oD7PthFSR08bVzz1WYH+e18YruQRbmKGNNU4iRcuPdfna4YgECtADS2c9a9W4u7Ib4XHLojS+BGntTDhxetPZbY0oAAA"); }
   </style>
-  <link rel="stylesheet" href="style.css?v=20261105181642" />
+  <link rel="stylesheet" href="style.css?v=20261106140512" />
 </head>
 <body>
   <div class="backdrop"></div>
   <div class="viewport" id="viewport">
     <div class="stage" id="stage">
       <div class="world" id="world">
-        <img class="map-bg" id="mapBg" alt="" draggable="false" fetchpriority="high" decoding="async"
+        <img class="map-bg" id="mapBg" alt="" draggable="false" decoding="async"
           src="assets/map-bg-1600.webp" />
         <div class="layer boats" id="boats"></div>
         <div class="layer houses" id="houses"></div>
@@ -27,10 +31,49 @@
         <div class="layer labels" id="labels"></div>
       </div>
     </div>
-    <a class="nav-btn" id="navBtn" href="nav.html">🧭 简洁导航</a>
+    <a class="nav-btn" id="navBtn" href="#">🧭 简洁导航</a>
     <button type="button" class="rotate-btn" id="rotateBtn" hidden></button>
   </div>
 
-  <script src="config.js?v=20261105181642"></script>
-  <script src="app.js?v=20261105181642"></script></body>
+  <!-- 简易导航：首页默认显示，地图在它下面后台加载 -->
+  <div class="nav-page" id="navPage">
+    <main>
+      <header>
+        <h1>🏝️ 应用导航</h1>
+        <a class="nav-enter" id="navEnter" href="#island"><i></i><span>🗺️ 进入小白岛</span></a>
+      </header>
+      <ul class="nav-list" id="navList"></ul>
+    </main>
+  </div>
+
+  <script src="config.js?v=20261106140512"></script>
+  <script>
+    (function () {
+      const cfg = window.MAP_CONFIG;
+      const list = document.getElementById("navList");
+      // 名称末尾的 emoji 拿来当图标，前面的文字当标题
+      const EMOJI_TAIL = /\s*(\p{Extended_Pictographic}[\p{Extended_Pictographic}\uFE0F\u200D]*)$/u;
+      cfg.sites
+        .concat(cfg.navExtra || [])
+        .filter((s) => s.name && s.url)
+        .forEach((s) => {
+          const m = s.name.match(EMOJI_TAIL);
+          const li = document.createElement("li");
+          const a = document.createElement("a");
+          a.className = "nav-item";
+          a.href = s.url;
+          if (cfg.openInNewTab) {
+            a.target = "_blank";
+            a.rel = "noopener";
+          }
+          a.innerHTML = `<span class="nav-icon"></span><span class="nav-text"><div class="nav-name"></div><div class="nav-desc"></div></span>`;
+          a.querySelector(".nav-icon").textContent = m ? m[1] : "🔗";
+          a.querySelector(".nav-name").textContent = m ? s.name.slice(0, m.index) : s.name;
+          a.querySelector(".nav-desc").textContent = s.desc || new URL(s.url).host;
+          li.append(a);
+          list.append(li);
+        });
+    })();
+  </script>
+  <script src="app.js?v=20261106140512"></script></body>
 </html>

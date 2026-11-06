@@ -532,6 +532,11 @@
     const dt = Math.min(raw / 1000, 0.1);
     last = now;
     const t = now / 1000;
+    // 简易导航盖住地图时不画雨雪，回到地图再接着来
+    if (document.documentElement.classList.contains("nav-mode")) {
+      requestAnimationFrame(frame);
+      return;
+    }
 
     // 切回标签页时的长间隔不算卡
     if (raw < 250) {

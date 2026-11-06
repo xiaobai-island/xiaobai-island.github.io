@@ -7,12 +7,8 @@ import re
 import time
 from pathlib import Path
 
-root = Path(__file__).resolve().parent.parent
+index = Path(__file__).resolve().parent.parent / "index.html"
 v = time.strftime("%Y%m%d%H%M%S")
-n = 0
-for page in ("index.html", "nav.html"):
-    path = root / page
-    html, k = re.subn(r'((?:href|src)="(?:style\.css|config\.js|app\.js))(?:\?v=\w+)?"', rf'\1?v={v}"', path.read_text())
-    path.write_text(html)
-    n += k
+html, n = re.subn(r'((?:href|src)="(?:style\.css|config\.js|app\.js))(?:\?v=\w+)?"', rf'\1?v={v}"', index.read_text())
+index.write_text(html)
 print(f"已更新 {n} 个链接，版本号 {v}")
