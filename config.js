@@ -22,7 +22,7 @@ window.MAP_CONFIG = {
       // depth 是木框厚度（像素），shadow 是投在塔身上的影子偏移（占叶片大小的百分比），spin 是转一圈的秒数
       mill: { img: "assets/houses/mill-blades.webp", x: 0.428, y: 0.282, size: 0.64,
         turn: -22, skew: 8, pitch: 14, depth: 2.5, shadow: [12, 6], spin: 10 } },
-    { name: "搞钱吧 🤑", url: "https://xiaobai-shouxi.github.io/", img: "assets/houses/house-4.webp", x: 560, y: 248, w: 112 },
+    { name: "招财猫 🤑", url: "https://xiaobai-shouxi.github.io/", img: "assets/houses/house-4.webp", x: 560, y: 248, w: 112 },
     { name: "小工具 🧰", url: "https://xiaobai-toolbox.github.io/", img: "assets/houses/house-5.webp", x: 735, y: 405, w: 112 },
     { img: "assets/houses/house-6.webp", x: 845, y: 300, w: 112 },
   ],
